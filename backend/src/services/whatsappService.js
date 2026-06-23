@@ -1,5 +1,7 @@
 import pkg from 'whatsapp-web.js';
-const { Client, LocalAuth } = pkg;
+const { Client, RemoteAuth } = pkg;
+import { MongoStore } from 'wwebjs-mongo';
+import mongoose from 'mongoose';
 import qrcode from 'qrcode-terminal';
 import { format } from 'date-fns';
 
@@ -11,19 +13,22 @@ let whatsappClient = null;
 // ── Client Initialization ──────────────────────────────────────────────────
 
 /**
- * Initializes the WhatsApp Web client with persistent local session.
+ * Initializes the WhatsApp Web client with persistent MongoDB session.
  * Call this once on server startup. The client emits events internally.
  */
 export const initWhatsApp = () => {
-  console.log('[WhatsApp] Initializing client...');
+  console.log('[WhatsApp] Initializing client with RemoteAuth (MongoDB)...');
+
+  const store = new MongoStore({ mongoose: mongoose });
 
   whatsappClient = new Client({
-    authStrategy: new LocalAuth({
-      // Session stored in backend/.wwebjs_auth/
-      dataPath: '.wwebjs_auth',
+    authStrategy: new RemoteAuth({
+      store: store,
+      backupSyncIntervalMs: 300000 // Save to DB every 5 mins if changed
     }),
     puppeteer: {
       headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -63,6 +68,11 @@ export const initWhatsApp = () => {
   whatsappClient.on('auth_failure', (message) => {
     clientStatus = 'AUTH_FAILURE';
     console.error('[WhatsApp] ❌ Authentication failed:', message);
+  });
+
+  // ── Event: Remote Session Saved ─────────────────────────────────────────
+  whatsappClient.on('remote_session_saved', () => {
+    console.log('[WhatsApp] 💾 Remote session saved to MongoDB successfully.');
   });
 
   // ── Event: Disconnected ─────────────────────────────────────────────────
