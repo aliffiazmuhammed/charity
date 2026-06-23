@@ -23,7 +23,9 @@ export const initWhatsApp = () => {
   // Mongoose connection.db can be undefined on first boot depending on the connection string
   const store = new MongoStore({ 
     mongoose: { 
+      mongo: mongoose.mongo,
       connection: {
+        ...mongoose.connection,
         db: mongoose.connection.db || mongoose.connection.getClient().db()
       }
     } 
