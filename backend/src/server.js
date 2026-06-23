@@ -14,8 +14,8 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB (wait for it to finish)
+await connectDB();
 
 // Initialize WhatsApp client (non-blocking — runs in background)
 // QR code will appear in terminal on first run
