@@ -42,10 +42,10 @@ export default function DashboardTab() {
     try {
       const [statsData, donationsData] = await Promise.all([
         getDashboardStats(),
-        getDonations(query)
+        getDonations({ search: query, limit: 5 })
       ]);
       setStats(statsData);
-      setDonations(donationsData);
+      setDonations(donationsData.donations || []);
       setError('');
     } catch (err) {
       setError('Failed to load dashboard data');

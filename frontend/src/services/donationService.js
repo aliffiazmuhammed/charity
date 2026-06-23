@@ -10,10 +10,8 @@ export const getDashboardStats = async () => {
   return response.data;
 };
 
-export const getDonations = async (searchQuery = '') => {
-  const response = await api.get(`/donations`, {
-    params: { search: searchQuery }
-  });
+export const getDonations = async (params = {}) => {
+  const response = await api.get(`/donations`, { params });
   return response.data;
 };
 

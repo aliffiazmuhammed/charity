@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, PlusCircle, Users } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Users, History } from 'lucide-react';
 import { validateToken, logout } from './services/authService';
 
 import Login from './components/Login';
@@ -8,6 +8,7 @@ import Header from './components/Header';
 import DashboardTab from './components/DashboardTab';
 import AddDonationTab from './components/AddDonationTab';
 import DonorDirectoryTab from './components/DonorDirectoryTab';
+import DonationHistoryTab from './components/DonationHistoryTab';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -65,6 +66,7 @@ function App() {
   // Define tabs configuration
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'history', label: 'Donation History', icon: History },
     { id: 'add', label: 'Add Donation', icon: PlusCircle },
     { id: 'directory', label: 'Donor Directory', icon: Users },
   ];
@@ -107,6 +109,7 @@ function App() {
             transition={{ duration: 0.2 }}
           >
             {activeTab === 'dashboard' && <DashboardTab />}
+            {activeTab === 'history' && <DonationHistoryTab />}
             {activeTab === 'add' && <AddDonationTab />}
             {activeTab === 'directory' && <DonorDirectoryTab />}
           </motion.div>

@@ -52,9 +52,9 @@ router.get('/export', async (req, res) => {
  */
 router.get('/', async (req, res) => {
   try {
-    const { search } = req.query;
-    const donations = await getAllDonations(search);
-    res.json(donations);
+    const { search, page, limit, sortBy, sortOrder } = req.query;
+    const result = await getAllDonations({ search, page, limit, sortBy, sortOrder });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -12,11 +12,11 @@ export const createDonation = async (donationData) => {
  * Get all donations, newest first.
  * Supports optional search by donor name or phone number.
  */
-export const getAllDonations = async (searchQuery) => {
+export const getAllDonations = async ({ search, page = 1, limit = 10, sortBy = 'date', sortOrder = 'desc' }) => {
   let filter = {};
 
-  if (searchQuery && searchQuery.trim().length > 0) {
-    const regex = new RegExp(searchQuery.trim(), 'i');
+  if (search && search.trim().length > 0) {
+    const regex = new RegExp(search.trim(), 'i');
     filter = {
       $or: [
         { donorName: { $regex: regex } },
@@ -25,7 +25,30 @@ export const getAllDonations = async (searchQuery) => {
     };
   }
 
-  return await Donation.find(filter).sort({ date: -1, createdAt: -1 });
+  // Construct sort object
+  const sortObj = {};
+  sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+  // Always add a secondary sort by createdAt to ensure stable pagination
+  if (sortBy !== 'createdAt') {
+    sortObj['createdAt'] = -1;
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [donations, totalDonations] = await Promise.all([
+    Donation.find(filter)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit)),
+    Donation.countDocuments(filter)
+  ]);
+
+  return {
+    donations,
+    totalDonations,
+    currentPage: parseInt(page),
+    totalPages: Math.ceil(totalDonations / limit)
+  };
 };
 
 /**
