@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-primary: var(--c-primary);
+  --color-primary-mid: var(--c-primary-mid);
+  --color-primary-dark: var(--c-primary-dark);
+  --color-primary-light: var(--c-primary-light);
+  
+  --color-gold: var(--c-gold);
+  --color-gold-light: var(--c-gold-light);
+  --color-gold-dark: var(--c-gold-dark);
+  
+  --color-bg: var(--c-bg);
+  --color-surface: var(--c-surface);
+  --color-warm-white: var(--c-warm-white);
+  
+  --color-border-default: var(--c-border);
+  --color-border-strong: var(--c-border-strong);
+  
+  --color-text-primary: var(--c-text-primary);
+  --color-text-secondary: var(--c-text-secondary);
+  --color-text-muted: var(--c-text-muted);
+  
+  --color-success: var(--c-success);
+  --color-success-bg: var(--c-success-bg);
+  --color-warning: var(--c-warning);
+  --color-warning-bg: var(--c-warning-bg);
+  --color-danger: var(--c-danger);
+  --color-danger-bg: var(--c-danger-bg);
+  --color-info: var(--c-info);
+  --color-info-bg: var(--c-info-bg);
+  
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  
+  --shadow-card: var(--shadow-card);
+  
+  --font-sans: var(--font);
+}
+
+@layer base {
+  :root {
+    /* --- Brand colours --- */
+    --c-primary:       #1B6B4A;   /* forest green — buttons, links, accents */
+    --c-primary-mid:   #2E8F63;   /* hover state */
+    --c-primary-dark:  #134D36;   /* sidebar bg, pressed state */
+    --c-primary-light: #E8F5EE;   /* tinted backgrounds, chips */
+
+    --c-gold:          #C8922A;   /* warm gold — export, highlights */
+    --c-gold-light:    #FDF3E3;   /* gold badge bg */
+    --c-gold-dark:     #8A6118;   /* gold badge text */
+
+    /* --- Surfaces --- */
+    --c-bg:            #F4F6F4;   /* page background */
+    --c-surface:       #FFFFFF;   /* card / panel surface */
+    --c-warm-white:    #FAFAF8;   /* subtle alternate surface */
+
+    /* --- Borders --- */
+    --c-border:        #D8E4DC;   /* default border */
+    --c-border-strong: #B5CCBC;   /* emphasized border */
+
+    /* --- Text --- */
+    --c-text-primary:  #1A2E22;   /* headings, strong body */
+    --c-text-secondary:#4A6355;   /* secondary labels */
+    --c-text-muted:    #7A9688;   /* captions, placeholders */
+
+    /* --- Semantic colours --- */
+    --c-success:       #2D7A4F;
+    --c-success-bg:    #EAF5EF;
+    --c-warning:       #B87820;
+    --c-warning-bg:    #FEF6E8;
+    --c-danger:        #B83232;
+    --c-danger-bg:     #FDEAEA;
+    --c-info:          #1B5C8A;
+    --c-info-bg:       #E8F2FA;
+
+    /* --- Spacing & shape --- */
+    --radius-sm:  6px;
+    --radius-md:  10px;
+    --radius-lg:  14px;
+    --radius-xl:  20px;
+    --shadow-card: 0 1px 4px rgba(27,107,74,0.07);
+
+    /* --- Typography --- */
+    --font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-bg text-text-primary font-sans antialiased;
+  }
+}
+
+/* Base custom scrollbar styles for a cleaner UI */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-border-strong rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-text-muted;
+}
