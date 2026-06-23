@@ -19,7 +19,15 @@ let whatsappClient = null;
 export const initWhatsApp = () => {
   console.log('[WhatsApp] Initializing client with RemoteAuth (MongoDB)...');
 
-  const store = new MongoStore({ mongoose: mongoose });
+  // Fix for wwebjs-mongo compatibility with Mongoose v8/9
+  // Mongoose connection.db can be undefined on first boot depending on the connection string
+  const store = new MongoStore({ 
+    mongoose: { 
+      connection: {
+        db: mongoose.connection.db || mongoose.connection.getClient().db()
+      }
+    } 
+  });
 
   whatsappClient = new Client({
     authStrategy: new RemoteAuth({
@@ -37,6 +45,11 @@ export const initWhatsApp = () => {
         '--no-first-run',
         '--no-zygote',
         '--disable-gpu',
+        '--single-process', // Aggressively saves memory
+        '--disable-software-rasterizer',
+        '--mute-audio',
+        '--disable-extensions',
+        '--js-flags="--max-old-space-size=256"' // Limit Chromium V8 heap
       ],
     },
   });
