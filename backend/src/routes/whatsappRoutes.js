@@ -1,5 +1,5 @@
 import express from 'express';
-import { getWhatsAppStatus } from '../services/whatsappService.js';
+import { getWhatsAppStatus, logoutWhatsApp } from '../services/whatsappService.js';
 import { auth } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -28,6 +28,19 @@ router.get('/qr', auth, (req, res) => {
     res.json({ qr, qrDataUrl });
   } else {
     res.status(404).json({ error: 'No active QR code available. Client might be connected or disconnected.' });
+  }
+});
+
+/**
+ * POST /api/whatsapp/logout
+ * Protected — manually logs out the current WhatsApp session and generates a new QR code.
+ */
+router.post('/logout', auth, async (req, res) => {
+  try {
+    await logoutWhatsApp();
+    res.json({ success: true, message: 'WhatsApp logged out successfully.' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 

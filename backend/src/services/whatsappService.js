@@ -10,6 +10,7 @@ import QRCode from 'qrcode';
 import { format } from 'date-fns';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 // ── Logger ─────────────────────────────────────────────────────────────────
 const logger = pino({ level: 'silent' }); // Baileys is very chatty — suppress its logs
@@ -87,8 +88,17 @@ export const initWhatsApp = async () => {
       const loggedOut = statusCode === DisconnectReason.loggedOut;
 
       if (loggedOut) {
-        clientStatus = 'AUTH_FAILURE';
-        console.error('[WhatsApp] ❌ Session logged out. Please delete auth_info/ and restart to re-authenticate.');
+        clientStatus = 'DISCONNECTED';
+        console.log('[WhatsApp] ❌ Session logged out. Cleaning up auth_info/ and restarting...');
+        try {
+          fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+        } catch (err) {
+          console.error('[WhatsApp] Failed to delete auth_info:', err.message);
+        }
+        // Restart to generate a fresh QR code
+        setTimeout(() => {
+          initWhatsApp();
+        }, 2000);
       } else {
         clientStatus = 'DISCONNECTED';
         console.warn(`[WhatsApp] ⚠️  Connection closed (code: ${statusCode}). Reconnecting in 5 seconds...`);
@@ -173,5 +183,18 @@ export const sendThankYouMessage = async (phone, donorName, amount, date) => {
     console.log(`[WhatsApp] ✅ Thank-you message sent to ${phone} (${donorName})`);
   } catch (error) {
     console.error(`[WhatsApp] ❌ Failed to send message to ${phone}:`, error.message);
+  }
+};
+
+/**
+ * Manually logs out the current WhatsApp session.
+ * This will trigger the 'loggedOut' disconnect event, which cleans up the directory and restarts.
+ */
+export const logoutWhatsApp = async () => {
+  if (sock && clientStatus === 'READY') {
+    console.log('[WhatsApp] Manually logging out current session...');
+    await sock.logout();
+  } else {
+    throw new Error('WhatsApp is not currently connected.');
   }
 };

@@ -58,12 +58,34 @@ export default function Header({ onLogout }) {
       <div className="flex items-center gap-4">
         {/* WhatsApp status pill */}
         <button
-          onClick={() => waStatus === 'QR_READY' && setIsQrModalOpen(true)}
-          disabled={waStatus !== 'QR_READY'}
+          onClick={async () => {
+            if (waStatus === 'QR_READY') {
+              setIsQrModalOpen(true);
+            } else if (waStatus === 'READY') {
+              if (window.confirm('Disconnect the current WhatsApp account? You will need to scan a new QR code.')) {
+                try {
+                  setWaStatus('DISCONNECTED'); // Optimistic update
+                  await api.post('/whatsapp/logout');
+                  fetchWAStatus(); // Fetch new status immediately
+                } catch (error) {
+                  console.error('Failed to logout WhatsApp', error);
+                  alert('Failed to disconnect WhatsApp. Please try again.');
+                  fetchWAStatus(); // Revert optimistic update
+                }
+              }
+            }
+          }}
+          disabled={!['QR_READY', 'READY'].includes(waStatus)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${statusStyle} ${
-            waStatus === 'QR_READY' ? 'hover:scale-105 cursor-pointer shadow-sm' : 'cursor-default'
+            ['QR_READY', 'READY'].includes(waStatus) ? 'hover:scale-105 cursor-pointer shadow-sm' : 'cursor-default'
           }`}
-          title={waStatus === 'QR_READY' ? 'Click to scan QR code' : ''}
+          title={
+            waStatus === 'QR_READY' 
+              ? 'Click to scan QR code' 
+              : waStatus === 'READY' 
+                ? 'Click to disconnect WhatsApp' 
+                : ''
+          }
         >
           {waStatus === 'QR_READY' ? <ScanQrCode size={13} /> : <MessageCircle size={13} />}
           <span>{statusLabel}</span>
