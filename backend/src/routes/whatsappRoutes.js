@@ -23,9 +23,9 @@ router.get('/status', auth, (req, res) => {
  * Returns 404 if no QR code is currently active.
  */
 router.get('/qr', auth, (req, res) => {
-  const { hasQR, qr } = getWhatsAppStatus();
+  const { hasQR, qr, qrDataUrl } = getWhatsAppStatus();
   if (hasQR && qr) {
-    res.json({ qr });
+    res.json({ qr, qrDataUrl });
   } else {
     res.status(404).json({ error: 'No active QR code available. Client might be connected or disconnected.' });
   }

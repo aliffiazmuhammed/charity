@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Smartphone, Loader2, AlertCircle } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import api from '../config/api';
 
 export default function WhatsAppQRModal({ isOpen, onClose }) {
@@ -16,7 +15,8 @@ export default function WhatsAppQRModal({ isOpen, onClose }) {
     const fetchQR = async () => {
       try {
         const response = await api.get('/whatsapp/qr');
-        setQrString(response.data.qr);
+        // The new backend returns qrDataUrl directly
+        setQrString(response.data.qrDataUrl || response.data.qr);
         setError(null);
         setIsLoading(false);
       } catch (err) {
@@ -82,12 +82,13 @@ export default function WhatsAppQRModal({ isOpen, onClose }) {
             ) : qrString ? (
               <div className="space-y-6">
                 <div className="p-4 bg-white rounded-xl shadow-sm border border-border-default inline-block mx-auto">
-                  <QRCodeSVG 
-                    value={qrString} 
-                    size={200}
-                    level="L"
-                    includeMargin={false}
-                  />
+                  {qrString && qrString.startsWith('data:image') ? (
+                    <img src={qrString} alt="WhatsApp QR Code" width={200} height={200} />
+                  ) : (
+                    <div style={{ width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Loader2 className="animate-spin text-text-muted" size={32} />
+                    </div>
+                  )}
                 </div>
                 <div className="text-sm text-text-secondary space-y-2">
                   <p>1. Open WhatsApp on your phone</p>

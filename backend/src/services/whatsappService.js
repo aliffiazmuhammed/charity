@@ -1,108 +1,105 @@
-import pkg from 'whatsapp-web.js';
-const { Client, RemoteAuth } = pkg;
-import { MongoStore } from 'wwebjs-mongo';
-import mongoose from 'mongoose';
-import qrcode from 'qrcode-terminal';
+import makeWASocket, {
+  useMultiFileAuthState,
+  DisconnectReason,
+  fetchLatestBaileysVersion,
+  makeCacheableSignalKeyStore,
+} from '@whiskeysockets/baileys';
+import { Boom } from '@hapi/boom';
+import pino from 'pino';
+import QRCode from 'qrcode';
 import { format } from 'date-fns';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ── Logger ─────────────────────────────────────────────────────────────────
+const logger = pino({ level: 'silent' }); // Baileys is very chatty — suppress its logs
+
+// ── Paths ──────────────────────────────────────────────────────────────────
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const AUTH_DIR = path.join(__dirname, '..', '..', 'auth_info');
 
 // ── State ──────────────────────────────────────────────────────────────────
 let clientStatus = 'DISCONNECTED'; // DISCONNECTED | QR_READY | AUTHENTICATED | READY | AUTH_FAILURE
-let currentQR = null;
-let whatsappClient = null;
+let currentQR = null;       // raw QR string
+let currentQRDataUrl = null; // base64 data-URL for <img> rendering
+let sock = null;
 
 // ── Client Initialization ──────────────────────────────────────────────────
 
 /**
- * Initializes the WhatsApp Web client with persistent MongoDB session.
- * Call this once on server startup. The client emits events internally.
+ * Initializes the WhatsApp client using Baileys (multi-device WebSocket).
+ * Call this once on server startup after MongoDB is connected.
  */
-export const initWhatsApp = () => {
-  console.log('[WhatsApp] Initializing client with RemoteAuth (MongoDB)...');
+export const initWhatsApp = async () => {
+  console.log('[WhatsApp] Initializing Baileys client...');
 
-  // Fix for wwebjs-mongo compatibility with Mongoose v8/9
-  // Mongoose connection.db can be undefined on first boot depending on the connection string
-  const store = new MongoStore({ 
-    mongoose: { 
-      mongo: mongoose.mongo,
-      connection: {
-        ...mongoose.connection,
-        db: mongoose.connection.db || mongoose.connection.getClient().db()
-      }
-    } 
-  });
+  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+  const { version } = await fetchLatestBaileysVersion();
 
-  whatsappClient = new Client({
-    authStrategy: new RemoteAuth({
-      store: store,
-      backupSyncIntervalMs: 300000 // Save to DB every 5 mins if changed
-    }),
-    puppeteer: {
-      headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        '--single-process', // Aggressively saves memory
-        '--disable-software-rasterizer',
-        '--mute-audio',
-        '--disable-extensions',
-        '--js-flags="--max-old-space-size=256"' // Limit Chromium V8 heap
-      ],
+  sock = makeWASocket({
+    version,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, logger),
     },
+    logger,
+    printQRInTerminal: true,          // Also print QR in terminal as fallback
+    generateHighQualityLinkPreview: false,
+    markOnlineOnConnect: false,       // Don't mark as "online" — this is a server
   });
 
-  // ── Event: QR Code ─────────────────────────────────────────────────────
-  whatsappClient.on('qr', (qr) => {
-    currentQR = qr;
-    clientStatus = 'QR_READY';
-    console.log('\n[WhatsApp] Scan the QR code below with your WhatsApp → Linked Devices:\n');
-    qrcode.generate(qr, { small: true });
-    console.log('\n[WhatsApp] Waiting for scan...');
-  });
+  // ── Event: Credentials Update ──────────────────────────────────────────
+  sock.ev.on('creds.update', saveCreds);
 
-  // ── Event: Authenticated ────────────────────────────────────────────────
-  whatsappClient.on('authenticated', () => {
-    clientStatus = 'AUTHENTICATED';
-    currentQR = null;
-    console.log('[WhatsApp] ✅ Authenticated successfully! Session saved to disk.');
-  });
+  // ── Event: Connection Update ───────────────────────────────────────────
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update;
 
-  // ── Event: Ready ────────────────────────────────────────────────────────
-  whatsappClient.on('ready', () => {
-    clientStatus = 'READY';
-    currentQR = null;
-    console.log('[WhatsApp] ✅ Client is ready! Thank-you messages will now be sent automatically.');
-  });
+    // QR code received — waiting for scan
+    if (qr) {
+      currentQR = qr;
+      try {
+        currentQRDataUrl = await QRCode.toDataURL(qr);
+      } catch {
+        currentQRDataUrl = null;
+      }
+      clientStatus = 'QR_READY';
+      console.log('[WhatsApp] QR code generated — scan with WhatsApp → Linked Devices');
+    }
 
-  // ── Event: Auth Failure ─────────────────────────────────────────────────
-  whatsappClient.on('auth_failure', (message) => {
-    clientStatus = 'AUTH_FAILURE';
-    console.error('[WhatsApp] ❌ Authentication failed:', message);
-  });
+    // Connection opened
+    if (connection === 'open') {
+      clientStatus = 'READY';
+      currentQR = null;
+      currentQRDataUrl = null;
+      console.log('[WhatsApp] ✅ Client is ready! Thank-you messages will now be sent automatically.');
+    }
 
-  // ── Event: Remote Session Saved ─────────────────────────────────────────
-  whatsappClient.on('remote_session_saved', () => {
-    console.log('[WhatsApp] 💾 Remote session saved to MongoDB successfully.');
-  });
+    // Connection closed
+    if (connection === 'close') {
+      currentQR = null;
+      currentQRDataUrl = null;
 
-  // ── Event: Disconnected ─────────────────────────────────────────────────
-  whatsappClient.on('disconnected', (reason) => {
-    clientStatus = 'DISCONNECTED';
-    console.warn('[WhatsApp] ⚠️  Client disconnected:', reason);
-    console.log('[WhatsApp] Attempting to reconnect in 10 seconds...');
-    // Auto-reconnect after 10 seconds
-    setTimeout(() => {
-      console.log('[WhatsApp] Reconnecting...');
-      whatsappClient.initialize();
-    }, 10000);
-  });
+      const statusCode = (lastDisconnect?.error instanceof Boom)
+        ? lastDisconnect.error.output?.statusCode
+        : lastDisconnect?.error?.output?.statusCode;
 
-  whatsappClient.initialize();
+      const loggedOut = statusCode === DisconnectReason.loggedOut;
+
+      if (loggedOut) {
+        clientStatus = 'AUTH_FAILURE';
+        console.error('[WhatsApp] ❌ Session logged out. Please delete auth_info/ and restart to re-authenticate.');
+      } else {
+        clientStatus = 'DISCONNECTED';
+        console.warn(`[WhatsApp] ⚠️  Connection closed (code: ${statusCode}). Reconnecting in 5 seconds...`);
+        // Auto-reconnect for non-logout disconnections
+        setTimeout(() => {
+          console.log('[WhatsApp] Reconnecting...');
+          initWhatsApp();
+        }, 5000);
+      }
+    }
+  });
 };
 
 // ── Status Helpers ─────────────────────────────────────────────────────────
@@ -112,14 +109,15 @@ export const getWhatsAppStatus = () => ({
   isReady: clientStatus === 'READY',
   hasQR: clientStatus === 'QR_READY',
   qr: currentQR,
+  qrDataUrl: currentQRDataUrl,
 });
 
 // ── Message Sender ─────────────────────────────────────────────────────────
 
 /**
- * Format a phone number for WhatsApp.
+ * Format a phone number for WhatsApp (Baileys format).
  * Strips spaces/dashes, adds India (+91) country code if not present.
- * WhatsApp requires: <country_code><number>@c.us
+ * Baileys requires: <country_code><number>@s.whatsapp.net
  */
 const formatPhoneForWhatsApp = (phone) => {
   // Strip all non-digit characters
@@ -130,7 +128,7 @@ const formatPhoneForWhatsApp = (phone) => {
     digits = `91${digits}`;
   }
 
-  return `${digits}@c.us`;
+  return `${digits}@s.whatsapp.net`;
 };
 
 /**
@@ -168,10 +166,10 @@ export const sendThankYouMessage = async (phone, donorName, amount, date) => {
   }
 
   try {
-    const chatId = formatPhoneForWhatsApp(phone);
+    const jid = formatPhoneForWhatsApp(phone);
     const message = buildThankYouMessage(donorName, amount, date);
 
-    await whatsappClient.sendMessage(chatId, message);
+    await sock.sendMessage(jid, { text: message });
     console.log(`[WhatsApp] ✅ Thank-you message sent to ${phone} (${donorName})`);
   } catch (error) {
     console.error(`[WhatsApp] ❌ Failed to send message to ${phone}:`, error.message);
