@@ -1,5 +1,4 @@
 import makeWASocket, {
-  useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
@@ -8,16 +7,11 @@ import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import QRCode from 'qrcode';
 import { format } from 'date-fns';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+import { useMongoDBAuthState } from '../utils/mongoAuthState.js';
+import { WhatsAppAuth } from '../models/WhatsAppAuth.js';
 
 // ── Logger ─────────────────────────────────────────────────────────────────
 const logger = pino({ level: 'silent' }); // Baileys is very chatty — suppress its logs
-
-// ── Paths ──────────────────────────────────────────────────────────────────
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const AUTH_DIR = path.join(__dirname, '..', '..', 'auth_info');
 
 // ── State ──────────────────────────────────────────────────────────────────
 let clientStatus = 'DISCONNECTED'; // DISCONNECTED | QR_READY | AUTHENTICATED | READY | AUTH_FAILURE
@@ -34,7 +28,7 @@ let sock = null;
 export const initWhatsApp = async () => {
   console.log('[WhatsApp] Initializing Baileys client...');
 
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+  const { state, saveCreds } = await useMongoDBAuthState();
   const { version } = await fetchLatestBaileysVersion();
 
   sock = makeWASocket({
@@ -89,11 +83,11 @@ export const initWhatsApp = async () => {
 
       if (loggedOut) {
         clientStatus = 'DISCONNECTED';
-        console.log('[WhatsApp] ❌ Session logged out. Cleaning up auth_info/ and restarting...');
+        console.log('[WhatsApp] ❌ Session logged out. Cleaning up MongoDB auth state and restarting...');
         try {
-          fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+          await WhatsAppAuth.deleteMany({});
         } catch (err) {
-          console.error('[WhatsApp] Failed to delete auth_info:', err.message);
+          console.error('[WhatsApp] Failed to delete MongoDB auth state:', err.message);
         }
         // Restart to generate a fresh QR code
         setTimeout(() => {
