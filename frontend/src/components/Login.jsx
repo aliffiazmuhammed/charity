@@ -33,11 +33,11 @@ export default function Login({ onLoginSuccess }) {
         className="bg-surface w-full max-w-md p-8 rounded-xl shadow-card border border-border-default"
       >
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary-light text-primary mx-auto rounded-full flex items-center justify-center mb-4">
-            <Lock size={32} />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-light text-primary mb-4">
+            <ShieldCheck size={32} />
           </div>
           <h2 className="text-2xl font-bold text-text-primary">Admin Login</h2>
-          <p className="text-text-muted mt-2">Charity Donation Registry</p>
+          <p className="text-text-muted mt-2">Meenangadi Charitable Trust</p>
         </div>
 
         {error && (

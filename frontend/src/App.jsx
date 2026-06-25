@@ -57,7 +57,7 @@ function App() {
   };
 
   if (isCheckingAuth) {
-    return <div className="min-h-screen bg-bg flex items-center justify-center text-text-muted">Loading Charity Registry...</div>;
+    return <div className="min-h-screen bg-bg flex items-center justify-center text-text-muted">Loading Meenangadi Charitable Trust...</div>;
   }
 
   if (!isAuthenticated) {
@@ -122,7 +122,7 @@ function App() {
       {/* Footer */}
       <footer className="w-full border-t border-border-default mt-auto py-6 bg-surface text-center">
         <p className="text-xs text-text-muted">
-          Charity Society Donation Registry © {new Date().getFullYear()} • Secure Internal Dashboard
+          Meenangadi Charitable Trust © {new Date().getFullYear()} • Secure Internal Dashboard
         </p>
       </footer>
     </div>

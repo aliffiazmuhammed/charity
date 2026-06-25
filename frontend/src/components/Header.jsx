@@ -51,7 +51,7 @@ export default function Header({ onLogout }) {
     <div className="w-full flex justify-between items-center py-4 px-6 max-w-6xl mx-auto">
       {/* Brand */}
       <h1 className="text-2xl font-bold tracking-tight text-gold-light">
-        CharityFlow <span className="font-normal opacity-80 text-lg">Registry</span>
+        Meenangadi Charitable Trust
       </h1>
 
       {/* Right side */}

@@ -30,7 +30,7 @@ app.use(express.json());
 
 // Health check
 app.get('/api/status', (req, res) => {
-  res.json({ status: 'OK', message: 'Charity Donation Registry API is running' });
+  res.json({ status: 'OK', message: 'Meenangadi Charitable Trust API is running' });
 });
 
 // Auth routes (login, refresh, validate)
