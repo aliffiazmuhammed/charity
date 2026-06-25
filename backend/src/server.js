@@ -8,6 +8,7 @@ import authRoutes from './routes/authRoutes.js';
 import donationRoutes from './routes/donationRoutes.js';
 import donorRoutes from './routes/donorRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
+import templateRoutes from './routes/templateRoutes.js';
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ app.use('/api/whatsapp', whatsappRoutes);
 // All donation and donor routes require a valid access token
 app.use('/api/donations', auth, donationRoutes);
 app.use('/api/donors', auth, donorRoutes);
+app.use('/api/templates', auth, templateRoutes);
 
 // ── Global Error Handler ────────────────────────────────────────────
 

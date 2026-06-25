@@ -6,7 +6,7 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import QRCode from 'qrcode';
-import { format } from 'date-fns';
+import { format as fnsFormat } from 'date-fns';
 import { useMongoDBAuthState } from '../utils/mongoAuthState.js';
 import { WhatsAppAuth } from '../models/WhatsAppAuth.js';
 
@@ -18,6 +18,7 @@ let clientStatus = 'DISCONNECTED'; // DISCONNECTED | QR_READY | AUTHENTICATED | 
 let currentQR = null;       // raw QR string
 let currentQRDataUrl = null; // base64 data-URL for <img> rendering
 let sock = null;
+let saveCreds = null;        // keep a reference so we can flush creds before reconnect
 
 // ── Client Initialization ──────────────────────────────────────────────────
 
@@ -28,7 +29,8 @@ let sock = null;
 export const initWhatsApp = async () => {
   console.log('[WhatsApp] Initializing Baileys client...');
 
-  const { state, saveCreds } = await useMongoDBAuthState();
+  const { state, saveCreds: _saveCreds } = await useMongoDBAuthState();
+  saveCreds = _saveCreds;       // store reference for use in disconnect handler
   const { version } = await fetchLatestBaileysVersion();
 
   sock = makeWASocket({
@@ -79,28 +81,46 @@ export const initWhatsApp = async () => {
         ? lastDisconnect.error.output?.statusCode
         : lastDisconnect?.error?.output?.statusCode;
 
-      const loggedOut = statusCode === DisconnectReason.loggedOut;
+      console.log(`[WhatsApp] Connection closed with status code: ${statusCode}`);
 
-      if (loggedOut) {
+      // Only treat status 401 (loggedOut) as a true logout that requires wiping creds.
+      // Other codes (408 timeout, 428 connection lost, 500 internal, 503 unavailable,
+      // 515 restart required) are all recoverable — just reconnect with existing session.
+      if (statusCode === DisconnectReason.loggedOut) {
         clientStatus = 'DISCONNECTED';
-        console.log('[WhatsApp] ❌ Session logged out. Cleaning up MongoDB auth state and restarting...');
+        console.log('[WhatsApp] ❌ Session logged out by user. Clearing auth state and generating fresh QR...');
         try {
           await WhatsAppAuth.deleteMany({});
+          console.log('[WhatsApp] 🗑️  Auth state cleared from MongoDB');
         } catch (err) {
           console.error('[WhatsApp] Failed to delete MongoDB auth state:', err.message);
         }
         // Restart to generate a fresh QR code
         setTimeout(() => {
           initWhatsApp();
-        }, 2000);
+        }, 3000);
       } else {
         clientStatus = 'DISCONNECTED';
-        console.warn(`[WhatsApp] ⚠️  Connection closed (code: ${statusCode}). Reconnecting in 5 seconds...`);
-        // Auto-reconnect for non-logout disconnections
+
+        // Flush credentials to MongoDB before reconnecting — this ensures
+        // any in-memory cred updates are persisted even if the container
+        // restarts between now and the reconnect.
+        try {
+          if (saveCreds) {
+            await saveCreds();
+            console.log('[WhatsApp] 💾 Credentials flushed to MongoDB before reconnect');
+          }
+        } catch (err) {
+          console.error('[WhatsApp] ⚠️  Failed to flush credentials before reconnect:', err.message);
+        }
+
+        const delay = statusCode === DisconnectReason.restartRequired ? 1000 : 5000;
+        console.log(`[WhatsApp] ⚠️  Recoverable disconnect (code: ${statusCode}). Reconnecting in ${delay / 1000}s...`);
+
         setTimeout(() => {
           console.log('[WhatsApp] Reconnecting...');
           initWhatsApp();
-        }, 5000);
+        }, delay);
       }
     }
   });
@@ -136,45 +156,55 @@ const formatPhoneForWhatsApp = (phone) => {
 };
 
 /**
- * Build the personalised thank-you message.
+ * Build a message by interpolating placeholders in a template body.
+ * Supported placeholders: {{donorName}}, {{amount}}, {{date}}
+ *
+ * @param {string} templateBody - The template string with placeholders
+ * @param {string} donorName   - Donor's full name
+ * @param {number} amount      - Donated amount in INR
+ * @param {Date|string} date   - Donation date
+ * @returns {string} The interpolated message
  */
-const buildThankYouMessage = (donorName, amount, donationDate) => {
-  const formattedDate = format(new Date(donationDate), 'dd MMM yyyy');
+const buildMessageFromTemplate = (templateBody, donorName, amount, date) => {
+  const formattedDate = fnsFormat(new Date(date), 'dd MMM yyyy');
   const formattedAmount = `₹${Number(amount).toLocaleString('en-IN')}`;
 
-  return (
-    `🙏 *Thank You, ${donorName}!*\n\n` +
-    `Your generous donation of *${formattedAmount}* has been received and registered on ${formattedDate}.\n\n` +
-    `Your contribution makes a real difference to our cause. We are deeply grateful for your heartfelt support.\n\n` +
-    `With warm regards,\n` +
-    `*Charity Society Registry* 🌿`
-  );
+  return templateBody
+    .replace(/\{\{donorName\}\}/g, donorName)
+    .replace(/\{\{amount\}\}/g, formattedAmount)
+    .replace(/\{\{date\}\}/g, formattedDate);
 };
 
 /**
- * Send a WhatsApp thank-you message to a donor.
+ * Send a WhatsApp message to a donor using a template.
  * This is a non-blocking, fire-and-forget function.
  * It will NOT throw — failures are logged but never propagate to the caller.
  *
- * @param {string} phone      - Donor phone number (10 digits or with country code)
- * @param {string} donorName  - Donor's full name
- * @param {number} amount     - Donated amount in INR
- * @param {Date|string} date  - Donation date
+ * @param {string} phone         - Donor phone number (10 digits or with country code)
+ * @param {string} donorName     - Donor's full name
+ * @param {number} amount        - Donated amount in INR
+ * @param {Date|string} date     - Donation date
+ * @param {string} templateBody  - The template body with {{placeholders}}
  */
-export const sendThankYouMessage = async (phone, donorName, amount, date) => {
+export const sendThankYouMessage = async (phone, donorName, amount, date, templateBody) => {
+  if (!templateBody) {
+    console.warn(`[WhatsApp] Skipping message to ${phone}: no active template`);
+    return;
+  }
+
   if (clientStatus !== 'READY') {
     console.warn(
-      `[WhatsApp] Skipping thank-you message to ${phone}: client not ready (status: ${clientStatus})`
+      `[WhatsApp] Skipping message to ${phone}: client not ready (status: ${clientStatus})`
     );
     return;
   }
 
   try {
     const jid = formatPhoneForWhatsApp(phone);
-    const message = buildThankYouMessage(donorName, amount, date);
+    const message = buildMessageFromTemplate(templateBody, donorName, amount, date);
 
     await sock.sendMessage(jid, { text: message });
-    console.log(`[WhatsApp] ✅ Thank-you message sent to ${phone} (${donorName})`);
+    console.log(`[WhatsApp] ✅ Message sent to ${phone} (${donorName})`);
   } catch (error) {
     console.error(`[WhatsApp] ❌ Failed to send message to ${phone}:`, error.message);
   }

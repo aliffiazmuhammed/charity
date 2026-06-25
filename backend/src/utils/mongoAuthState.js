@@ -12,12 +12,22 @@ export const useMongoDBAuthState = async () => {
     const credsDoc = await WhatsAppAuth.findById('creds');
     if (credsDoc && credsDoc.value) {
       creds = JSON.parse(JSON.stringify(credsDoc.value), BufferJSON.reviver);
+      console.log('[WhatsApp Auth] ✅ Loaded existing credentials from MongoDB (session should resume without QR)');
     } else {
       creds = initAuthCreds();
+      console.log('[WhatsApp Auth] ℹ️  No existing credentials found — fresh session will require QR scan');
     }
   } catch (error) {
-    console.error('Failed to load WhatsApp credentials from MongoDB:', error);
+    console.error('[WhatsApp Auth] ❌ Failed to load credentials from MongoDB:', error.message);
     creds = initAuthCreds();
+  }
+
+  // Log how many auth keys exist (helps debug persistence issues)
+  try {
+    const keyCount = await WhatsAppAuth.countDocuments({ _id: { $ne: 'creds' } });
+    console.log(`[WhatsApp Auth] 🔑 Found ${keyCount} signal keys in MongoDB`);
+  } catch {
+    // non-critical — just for debugging
   }
 
   return {
@@ -36,7 +46,7 @@ export const useMongoDBAuthState = async () => {
               })
             );
           } catch (error) {
-            console.error('Failed to get WhatsApp keys from MongoDB:', error);
+            console.error('[WhatsApp Auth] Failed to get keys from MongoDB:', error.message);
           }
           return data;
         },
@@ -63,7 +73,7 @@ export const useMongoDBAuthState = async () => {
             }
             await Promise.all(tasks);
           } catch (error) {
-            console.error('Failed to set WhatsApp keys in MongoDB:', error);
+            console.error('[WhatsApp Auth] Failed to set keys in MongoDB:', error.message);
           }
         },
       },
@@ -75,8 +85,9 @@ export const useMongoDBAuthState = async () => {
           { value: JSON.parse(JSON.stringify(creds, BufferJSON.replacer)) },
           { upsert: true }
         );
+        console.log('[WhatsApp Auth] 💾 Credentials saved to MongoDB');
       } catch (error) {
-        console.error('Failed to save WhatsApp credentials to MongoDB:', error);
+        console.error('[WhatsApp Auth] ❌ Failed to save credentials to MongoDB:', error.message);
       }
     },
   };

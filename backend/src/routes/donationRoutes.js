@@ -9,6 +9,7 @@ import {
 } from '../services/donationService.js';
 import { generateCSV } from '../utils/csvExport.js';
 import { sendThankYouMessage } from '../services/whatsappService.js';
+import { getActiveTemplate } from '../services/templateService.js';
 
 const router = express.Router();
 
@@ -78,12 +79,18 @@ router.post('/', validateDonation, async (req, res) => {
 
     // ── Fire-and-forget WhatsApp thank-you ────────────────────────────
     // Runs asynchronously — a WhatsApp failure will NEVER block the save.
-    sendThankYouMessage(
-      newDonation.phone,
-      newDonation.donorName,
-      newDonation.amount,
-      newDonation.date
-    );
+    // Fetch the active template; if none exists, no message is sent.
+    getActiveTemplate().then((template) => {
+      sendThankYouMessage(
+        newDonation.phone,
+        newDonation.donorName,
+        newDonation.amount,
+        newDonation.date,
+        template?.body
+      );
+    }).catch((err) => {
+      console.error('[Donation] Failed to fetch active template:', err.message);
+    });
 
     res.status(201).json(newDonation);
   } catch (error) {
