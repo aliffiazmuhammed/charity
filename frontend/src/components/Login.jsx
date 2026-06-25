@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, User } from 'lucide-react';
+import { Lock, User, ShieldCheck } from 'lucide-react';
 import { login } from '../services/authService';
 
 export default function Login({ onLoginSuccess }) {
