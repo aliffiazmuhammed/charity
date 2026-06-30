@@ -40,7 +40,6 @@ export const initWhatsApp = async () => {
       keys: makeCacheableSignalKeyStore(state.keys, logger),
     },
     logger,
-    printQRInTerminal: true,          // Also print QR in terminal as fallback
     generateHighQualityLinkPreview: false,
     markOnlineOnConnect: false,       // Don't mark as "online" — this is a server
   });
@@ -88,13 +87,9 @@ export const initWhatsApp = async () => {
       // 515 restart required) are all recoverable — just reconnect with existing session.
       if (statusCode === DisconnectReason.loggedOut) {
         clientStatus = 'DISCONNECTED';
-        console.log('[WhatsApp] ❌ Session logged out by user. Clearing auth state and generating fresh QR...');
-        try {
-          await WhatsAppAuth.deleteMany({});
-          console.log('[WhatsApp] 🗑️  Auth state cleared from MongoDB');
-        } catch (err) {
-          console.error('[WhatsApp] Failed to delete MongoDB auth state:', err.message);
-        }
+        console.log('[WhatsApp] ❌ Session logged out by user. Preserving auth state in MongoDB as requested and generating fresh QR...');
+        // We no longer delete the auth state from MongoDB here based on your request.
+
         // Restart to generate a fresh QR code
         setTimeout(() => {
           initWhatsApp();

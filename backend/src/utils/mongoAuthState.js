@@ -63,7 +63,7 @@ export const useMongoDBAuthState = async () => {
                     WhatsAppAuth.findByIdAndUpdate(
                       key,
                       { value: valueToStore },
-                      { upsert: true, new: true }
+                      { upsert: true, returnDocument: 'after' }
                     )
                   );
                 } else {
