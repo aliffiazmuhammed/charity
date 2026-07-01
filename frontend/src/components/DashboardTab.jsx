@@ -11,7 +11,7 @@ import {
   Download,
   AlertCircle
 } from 'lucide-react';
-import { getDashboardStats, getDonations, deleteDonation, exportDonationsCSV } from '../services/donationService';
+import { getDashboardStats, getDonations, deleteDonation, exportDonationsCSV, getCareOfStats } from '../services/donationService';
 
 const StatCard = ({ title, value, icon: Icon, delay }) => (
   <motion.div
@@ -33,6 +33,7 @@ const StatCard = ({ title, value, icon: Icon, delay }) => (
 export default function DashboardTab() {
   const [stats, setStats] = useState({ totalRaised: 0, donationCount: 0, uniqueDonors: 0, averageAmount: 0 });
   const [donations, setDonations] = useState([]);
+  const [careOfStats, setCareOfStats] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,12 +41,14 @@ export default function DashboardTab() {
   const loadData = async (query = '') => {
     setIsLoading(true);
     try {
-      const [statsData, donationsData] = await Promise.all([
+      const [statsData, donationsData, careOfData] = await Promise.all([
         getDashboardStats(),
-        getDonations({ search: query, limit: 5 })
+        getDonations({ search: query, limit: 5 }),
+        getCareOfStats()
       ]);
       setStats(statsData);
       setDonations(donationsData.donations || []);
+      setCareOfStats(careOfData.slice(0, 5));
       setError('');
     } catch (err) {
       setError('Failed to load dashboard data');
@@ -127,6 +130,7 @@ export default function DashboardTab() {
                 <th className="p-4 font-medium border-b border-border-default">Name</th>
                 <th className="p-4 font-medium border-b border-border-default">Phone</th>
                 <th className="p-4 font-medium border-b border-border-default">Amount</th>
+                <th className="p-4 font-medium border-b border-border-default">Care Of</th>
                 <th className="p-4 font-medium border-b border-border-default">Note</th>
                 <th className="p-4 font-medium border-b border-border-default w-16"></th>
               </tr>
@@ -134,11 +138,11 @@ export default function DashboardTab() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan="6" className="p-8 text-center text-text-muted">Loading...</td>
+                  <td colSpan="7" className="p-8 text-center text-text-muted">Loading...</td>
                 </tr>
               ) : donations.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="p-8 text-center text-text-muted">
+                  <td colSpan="7" className="p-8 text-center text-text-muted">
                     <div className="flex flex-col items-center gap-2">
                       <AlertCircle size={24} className="text-warning" />
                       <p>No donations found.</p>
@@ -156,6 +160,7 @@ export default function DashboardTab() {
                     <td className="p-4 text-sm font-semibold text-success bg-success-bg/50 rounded inline-block mt-3 ml-4 px-2 py-0.5">
                       {formatCurrency(d.amount)}
                     </td>
+                    <td className="p-4 text-sm text-text-secondary">{d.careOf || '-'}</td>
                     <td className="p-4 text-sm text-text-muted max-w-xs truncate" title={d.note}>
                       {d.note || '-'}
                     </td>
@@ -175,6 +180,45 @@ export default function DashboardTab() {
           </table>
         </div>
       </motion.div>
+
+      {/* Top Care Of Contributors */}
+      {careOfStats.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
+          className="bg-surface rounded-xl border border-border-default shadow-card overflow-hidden"
+        >
+          <div className="p-4 border-b border-border-default bg-warm-white">
+            <h2 className="text-lg font-semibold text-text-primary">Top Care Of Contributors</h2>
+            <p className="text-sm text-text-muted">People who brought in the most donations</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-bg text-text-secondary text-sm">
+                  <th className="p-4 font-medium border-b border-border-default">Rank</th>
+                  <th className="p-4 font-medium border-b border-border-default">Name</th>
+                  <th className="p-4 font-medium border-b border-border-default">Total Amount</th>
+                  <th className="p-4 font-medium border-b border-border-default">Donations</th>
+                  <th className="p-4 font-medium border-b border-border-default">Unique Donors</th>
+                </tr>
+              </thead>
+              <tbody>
+                {careOfStats.map((c, index) => (
+                  <tr key={c.careOf} className="border-b border-border-default hover:bg-warm-white transition-colors">
+                    <td className="p-4 text-sm text-text-muted font-medium">#{index + 1}</td>
+                    <td className="p-4 text-sm font-semibold text-text-primary">{c.careOf}</td>
+                    <td className="p-4 text-sm font-bold text-success">{formatCurrency(c.totalAmount)}</td>
+                    <td className="p-4 text-sm text-text-secondary">{c.donationCount}</td>
+                    <td className="p-4 text-sm text-text-secondary">{c.uniqueDonors}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

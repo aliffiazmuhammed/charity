@@ -29,6 +29,11 @@ const donationSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    careOf: {
+      type: String,
+      trim: true,
+      default: '',
+    },
   },
   {
     timestamps: true,
@@ -37,5 +42,6 @@ const donationSchema = new mongoose.Schema(
 
 // Compound index for fast donor lookups and date sorting
 donationSchema.index({ phone: 1, date: -1 });
+donationSchema.index({ careOf: 1 });
 
 export const Donation = mongoose.model('Donation', donationSchema);

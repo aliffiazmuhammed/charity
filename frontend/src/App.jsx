@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, PlusCircle, Users, History, MessageSquareText } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Users, History, MessageSquareText, HandHeart } from 'lucide-react';
 import { validateToken, logout } from './services/authService';
 
 import Login from './components/Login';
@@ -10,6 +10,7 @@ import AddDonationTab from './components/AddDonationTab';
 import DonorDirectoryTab from './components/DonorDirectoryTab';
 import DonationHistoryTab from './components/DonationHistoryTab';
 import MessageTemplatesTab from './components/MessageTemplatesTab';
+import CareOfTab from './components/CareOfTab';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -70,6 +71,7 @@ function App() {
     { id: 'history', label: 'Donation History', icon: History },
     { id: 'add', label: 'Add Donation', icon: PlusCircle },
     { id: 'directory', label: 'Donor Directory', icon: Users },
+    { id: 'careof', label: 'Care Of', icon: HandHeart },
     { id: 'templates', label: 'Message Templates', icon: MessageSquareText },
   ];
 
@@ -114,6 +116,7 @@ function App() {
             {activeTab === 'history' && <DonationHistoryTab />}
             {activeTab === 'add' && <AddDonationTab />}
             {activeTab === 'directory' && <DonorDirectoryTab />}
+            {activeTab === 'careof' && <CareOfTab />}
             {activeTab === 'templates' && <MessageTemplatesTab />}
           </motion.div>
         </AnimatePresence>

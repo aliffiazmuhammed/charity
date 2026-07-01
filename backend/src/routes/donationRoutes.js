@@ -6,6 +6,7 @@ import {
   deleteDonation,
   getDashboardStats,
   getAllDonationsForExport,
+  getCareOfStats,
 } from '../services/donationService.js';
 import { generateCSV } from '../utils/csvExport.js';
 import { sendThankYouMessage } from '../services/whatsappService.js';
@@ -48,6 +49,19 @@ router.get('/export', async (req, res) => {
 });
 
 /**
+ * GET /api/donations/care-of-stats
+ * Care-of statistics: totals grouped by care-of person.
+ */
+router.get('/care-of-stats', async (req, res) => {
+  try {
+    const stats = await getCareOfStats();
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/donations
  * All donations (newest first). Supports ?search= query param.
  */
@@ -68,13 +82,14 @@ router.get('/', async (req, res) => {
  */
 router.post('/', validateDonation, async (req, res) => {
   try {
-    const { donorName, phone, amount, date, note } = req.body;
+    const { donorName, phone, amount, date, note, careOf } = req.body;
     const newDonation = await createDonation({
       donorName,
       phone,
       amount,
       date: date || new Date(),
       note: note || '',
+      careOf: careOf || '',
     });
 
     // ── Fire-and-forget WhatsApp thank-you ────────────────────────────

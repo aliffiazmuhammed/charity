@@ -29,7 +29,7 @@ const formatDate = (dateValue) => {
  * Columns: Name, Phone, Amount (₹), Date, Note
  */
 export const generateCSV = (donations) => {
-  const headers = ['Name', 'Phone', 'Amount (₹)', 'Date', 'Note'];
+  const headers = ['Name', 'Phone', 'Amount (₹)', 'Date', 'Note', 'Care Of'];
   const headerRow = headers.join(',');
 
   const dataRows = donations.map((donation) => {
@@ -39,6 +39,7 @@ export const generateCSV = (donations) => {
       escapeCSVField(donation.amount),
       escapeCSVField(formatDate(donation.date)),
       escapeCSVField(donation.note || ''),
+      escapeCSVField(donation.careOf || ''),
     ];
     return fields.join(',');
   });

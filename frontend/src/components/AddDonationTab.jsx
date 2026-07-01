@@ -10,6 +10,7 @@ export default function AddDonationTab() {
     phone: '',
     amount: '',
     date: format(new Date(), 'yyyy-MM-dd'),
+    careOf: '',
     note: ''
   });
   
@@ -64,6 +65,7 @@ export default function AddDonationTab() {
         phone: '',
         amount: '',
         date: format(new Date(), 'yyyy-MM-dd'),
+        careOf: '',
         note: ''
       });
       setReturningInfo(null);
@@ -186,6 +188,18 @@ export default function AddDonationTab() {
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-2 border border-border-strong rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-bg transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">Care Of (Optional)</label>
+              <input
+                type="text"
+                name="careOf"
+                value={formData.careOf}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-border-strong rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-bg transition-colors"
+                placeholder="Person who referred this donation"
               />
             </div>
           </div>

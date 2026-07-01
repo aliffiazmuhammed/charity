@@ -154,6 +154,9 @@ export default function DonationHistoryTab() {
                 <th className="p-4 font-medium border-b border-border-default cursor-pointer hover:bg-border-default/50 transition-colors" onClick={() => toggleSort('amount')}>
                   <div className="flex items-center gap-2">Amount {renderSortIcon('amount')}</div>
                 </th>
+                <th className="p-4 font-medium border-b border-border-default cursor-pointer hover:bg-border-default/50 transition-colors" onClick={() => toggleSort('careOf')}>
+                  <div className="flex items-center gap-2">Care Of {renderSortIcon('careOf')}</div>
+                </th>
                 <th className="p-4 font-medium border-b border-border-default">Note</th>
                 <th className="p-4 font-medium border-b border-border-default w-16"></th>
               </tr>
@@ -161,11 +164,11 @@ export default function DonationHistoryTab() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan="6" className="p-8 text-center text-text-muted">Loading...</td>
+                  <td colSpan="7" className="p-8 text-center text-text-muted">Loading...</td>
                 </tr>
               ) : donations.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="p-8 text-center text-text-muted">
+                  <td colSpan="7" className="p-8 text-center text-text-muted">
                     <div className="flex flex-col items-center gap-2">
                       <AlertCircle size={24} className="text-warning" />
                       <p>No donations found.</p>
@@ -183,6 +186,7 @@ export default function DonationHistoryTab() {
                     <td className="p-4 text-sm font-semibold text-success bg-success-bg/50 rounded inline-block mt-3 ml-4 px-2 py-0.5">
                       {formatCurrency(d.amount)}
                     </td>
+                    <td className="p-4 text-sm text-text-secondary">{d.careOf || '-'}</td>
                     <td className="p-4 text-sm text-text-muted max-w-xs truncate" title={d.note}>
                       {d.note || '-'}
                     </td>

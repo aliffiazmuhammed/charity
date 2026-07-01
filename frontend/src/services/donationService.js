@@ -56,3 +56,8 @@ export const exportDonationsCSV = () => {
       link.parentNode.removeChild(link);
     });
 };
+
+export const getCareOfStats = async () => {
+  const response = await api.get('/donations/care-of-stats');
+  return response.data;
+};

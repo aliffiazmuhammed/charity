@@ -116,6 +116,7 @@ export default function DonorDirectoryTab() {
                     <tr className="bg-bg text-text-secondary text-sm">
                       <th className="p-3 font-medium border-b border-border-default w-32">Date</th>
                       <th className="p-3 font-medium border-b border-border-default w-32">Amount</th>
+                      <th className="p-3 font-medium border-b border-border-default">Care Of</th>
                       <th className="p-3 font-medium border-b border-border-default">Note</th>
                     </tr>
                   </thead>
@@ -128,6 +129,7 @@ export default function DonorDirectoryTab() {
                         <td className="p-3 text-sm font-semibold text-text-primary">
                           {formatCurrency(d.amount)}
                         </td>
+                        <td className="p-3 text-sm text-text-secondary">{d.careOf || '-'}</td>
                         <td className="p-3 text-sm text-text-muted">
                           {d.note || '-'}
                         </td>

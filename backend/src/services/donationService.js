@@ -21,6 +21,7 @@ export const getAllDonations = async ({ search, page = 1, limit = 10, sortBy = '
       $or: [
         { donorName: { $regex: regex } },
         { phone: { $regex: regex } },
+        { careOf: { $regex: regex } },
       ],
     };
   }
@@ -107,6 +108,36 @@ export const getDashboardStats = async () => {
 export const getAllDonationsForExport = async () => {
   return await Donation.find()
     .sort({ date: -1 })
-    .select('donorName phone amount date note')
+    .select('donorName phone amount date note careOf')
     .lean();
+};
+
+/**
+ * Get care-of statistics: total amount, donation count, unique donors per care-of.
+ */
+export const getCareOfStats = async () => {
+  return await Donation.aggregate([
+    { $match: { careOf: { $exists: true, $ne: '' } } },
+    {
+      $group: {
+        _id: '$careOf',
+        careOf: { $first: '$careOf' },
+        totalAmount: { $sum: '$amount' },
+        donationCount: { $sum: 1 },
+        uniqueDonors: { $addToSet: '$phone' },
+        lastDate: { $max: '$date' },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        careOf: 1,
+        totalAmount: 1,
+        donationCount: 1,
+        uniqueDonors: { $size: '$uniqueDonors' },
+        lastDate: 1,
+      },
+    },
+    { $sort: { totalAmount: -1 } },
+  ]);
 };
