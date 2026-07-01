@@ -15,14 +15,21 @@ export default function WhatsAppQRModal({ isOpen, onClose }) {
     const fetchQR = async () => {
       try {
         const response = await api.get('/whatsapp/qr');
-        // The new backend returns qrDataUrl directly
         setQrString(response.data.qrDataUrl || response.data.qr);
         setError(null);
         setIsLoading(false);
       } catch (err) {
         if (err.response && err.response.status === 404) {
-          // No QR available (might be connected, or generating)
-          // We will let the parent close it if connected
+          // Check if the reason there's no QR is because we are now connected
+          try {
+            const statusRes = await api.get('/whatsapp/status');
+            if (statusRes.data.status === 'READY' || statusRes.data.status === 'AUTHENTICATED') {
+              onClose(); // Auto-close the modal!
+              return;
+            }
+          } catch (statusErr) {
+            console.error('Failed to check status', statusErr);
+          }
           setError('Waiting for QR code generation...');
         } else {
           setError('Failed to fetch QR code.');

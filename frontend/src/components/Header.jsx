@@ -106,7 +106,10 @@ export default function Header({ onLogout }) {
 
       <WhatsAppQRModal 
         isOpen={isQrModalOpen} 
-        onClose={() => setIsQrModalOpen(false)} 
+        onClose={() => {
+          setIsQrModalOpen(false);
+          fetchWAStatus();
+        }} 
       />
     </div>
   );
