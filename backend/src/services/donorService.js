@@ -27,15 +27,28 @@ export const getDonorProfile = async (phone) => {
   };
 };
 
-/**
- * Get all unique donors grouped by phone, sorted by total donated (highest first).
- * Uses MongoDB aggregation pipeline.
- */
-export const getAllDonors = async () => {
-  return await Donation.aggregate([
-    {
-      $sort: { date: -1 },
-    },
+export const getAllDonors = async ({ search, page = 1, limit = 10, sortBy = 'totalDonated', sortOrder = 'desc' }) => {
+  const pipeline = [];
+
+  // Match search query
+  if (search && search.trim().length > 0) {
+    const regex = new RegExp(search.trim(), 'i');
+    pipeline.push({
+      $match: {
+        $or: [
+          { donorName: { $regex: regex } },
+          { phone: { $regex: regex } },
+        ],
+      },
+    });
+  }
+
+  // Define sort for aggregation
+  const sortObj = {};
+  sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+  pipeline.push(
+    { $sort: { date: -1 } }, // Needed so $first grabs the latest donor name
     {
       $group: {
         _id: '$phone',
@@ -48,9 +61,6 @@ export const getAllDonors = async () => {
       },
     },
     {
-      $sort: { totalDonated: -1 },
-    },
-    {
       $project: {
         _id: 0,
         donorName: 1,
@@ -61,7 +71,30 @@ export const getAllDonors = async () => {
         lastDate: 1,
       },
     },
+    { $sort: sortObj }
+  );
+
+  const skip = (page - 1) * limit;
+
+  const result = await Donation.aggregate([
+    ...pipeline,
+    {
+      $facet: {
+        metadata: [{ $count: 'total' }],
+        data: [{ $skip: skip }, { $limit: parseInt(limit) }],
+      },
+    },
   ]);
+
+  const totalDonors = result[0].metadata[0]?.total || 0;
+  const donors = result[0].data;
+
+  return {
+    donors,
+    totalDonors,
+    currentPage: parseInt(page),
+    totalPages: Math.ceil(totalDonors / limit),
+  };
 };
 
 /**

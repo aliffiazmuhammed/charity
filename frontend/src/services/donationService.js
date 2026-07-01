@@ -26,8 +26,8 @@ export const deleteDonation = async (id) => {
 };
 
 // Donor Specific Services
-export const getAllDonors = async () => {
-  const response = await api.get('/donors');
+export const getAllDonors = async (params = {}) => {
+  const response = await api.get('/donors', { params });
   return response.data;
 };
 
