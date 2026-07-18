@@ -205,8 +205,9 @@ export const sendThankYouMessage = async (phone, donorName, amount, date, templa
     const jid = formatPhoneForWhatsApp(phone);
     const message = buildMessageFromTemplate(templateBody, donorName, amount, date);
 
-    await sock.sendMessage(jid, { text: message });
+    const result = await sock.sendMessage(jid, { text: message });
     console.log(`[WhatsApp] ✅ Message sent to ${phone} (${donorName})`);
+    console.log(`[WhatsApp] 📋 Server response:`, JSON.stringify(result?.key || result, null, 2));
   } catch (error) {
     console.error(`[WhatsApp] ❌ Failed to send message to ${phone}:`, error.message);
   }
