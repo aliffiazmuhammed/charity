@@ -401,11 +401,14 @@ export default function CampaignsTab({ onViewLogs }) {
                     </td>
                     <td className="px-6 py-4 text-text-secondary">{camp.totalMessages || 0}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-full ${
-                        camp.failed > 0 ? 'bg-danger-bg text-danger' : 'bg-success-bg text-success'
-                      }`}>
-                        {camp.failed > 0 ? `${camp.failed} Failed` : 'Success'}
-                      </span>
+                      {(() => {
+                        const q = camp.queued || 0;
+                        const s = camp.scheduled || 0;
+                        if (s > 0) return <span className="px-2 py-1 text-[10px] uppercase font-bold rounded-full bg-purple-100 text-purple-700">Scheduled ({s})</span>;
+                        if (q > 0) return <span className="px-2 py-1 text-[10px] uppercase font-bold rounded-full bg-blue-100 text-blue-700">Processing {camp.totalMessages - q}/{camp.totalMessages}</span>;
+                        if (camp.failed > 0) return <span className="px-2 py-1 text-[10px] uppercase font-bold rounded-full bg-danger-bg text-danger">{camp.failed} Failed</span>;
+                        return <span className="px-2 py-1 text-[10px] uppercase font-bold rounded-full bg-success-bg text-success">Completed</span>;
+                      })()}
                     </td>
                     <td className="px-6 py-4">
                       <button 

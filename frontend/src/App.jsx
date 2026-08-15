@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, PlusCircle, Users, History, MessageSquareText, HandHeart, Megaphone, Activity } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Users, History, MessageSquareText, HandHeart, Megaphone, Activity, BarChart3 } from 'lucide-react';
 import { validateToken, logout } from './services/authService';
 
 import Login from './components/Login';
@@ -13,6 +13,7 @@ import MessageTemplatesTab from './components/MessageTemplatesTab';
 import CareOfTab from './components/CareOfTab';
 import CampaignsTab from './components/CampaignsTab';
 import MessageLogsTab from './components/MessageLogsTab';
+import UsageTab from './components/UsageTab';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -78,6 +79,7 @@ function App() {
     { id: 'templates', label: 'Message Templates', icon: MessageSquareText },
     { id: 'campaigns', label: 'Campaigns', icon: Megaphone },
     { id: 'logs', label: 'Message Logs', icon: Activity },
+    { id: 'usage', label: 'Usage', icon: BarChart3 },
   ];
 
   return (
@@ -88,7 +90,7 @@ function App() {
         
         {/* Navigation Tabs */}
         <div className="max-w-6xl mx-auto px-6 pt-2">
-          <nav className="flex gap-1 overflow-x-auto pb-1 no-scrollbar">
+          <nav className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -128,6 +130,7 @@ function App() {
             {activeTab === 'templates' && <MessageTemplatesTab />}
             {activeTab === 'campaigns' && <CampaignsTab onViewLogs={(cid) => { setLogFilterCampaignId(cid); setActiveTab('logs'); }} />}
             {activeTab === 'logs' && <MessageLogsTab initialCampaignId={logFilterCampaignId} />}
+            {activeTab === 'usage' && <UsageTab />}
           </motion.div>
         </AnimatePresence>
       </main>

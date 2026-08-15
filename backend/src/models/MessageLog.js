@@ -70,6 +70,10 @@ const messageLogSchema = new mongoose.Schema(
       enum: ['image', 'document', 'video', 'audio', null],
       default: null,
     },
+    retryCount: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
@@ -79,7 +83,7 @@ const messageLogSchema = new mongoose.Schema(
 // Indexes for efficient queries
 messageLogSchema.index({ recipientPhone: 1, createdAt: -1 });
 messageLogSchema.index({ campaignId: 1 });
-messageLogSchema.index({ status: 1 });
+messageLogSchema.index({ status: 1, createdAt: 1 }); // For the background worker
 messageLogSchema.index({ donationId: 1 });
 
 export const MessageLog = mongoose.model('MessageLog', messageLogSchema);

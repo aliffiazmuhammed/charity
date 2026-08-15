@@ -1,5 +1,5 @@
 import express from 'express';
-import { sendBulkCampaignMessages, getMessageStats } from '../services/whatsappService.js';
+import { getMessageStats } from '../services/whatsappService.js';
 import { MessageLog } from '../models/MessageLog.js';
 
 const router = express.Router();
@@ -28,27 +28,53 @@ router.post('/send', async (req, res) => {
     const campaignId = `campaign_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const finalCampaignName = campaignName || `Campaign ${new Date().toLocaleString('en-IN')}`;
 
-    const results = await sendBulkCampaignMessages(
-      recipients,
-      templateName,
-      languageCode || 'en',
-      campaignId,
-      finalCampaignName,
-      options || {},
-      2000,
-      scheduledAt
-    );
+    const formatPhone = (phone) => {
+      let digits = phone.replace(/\D/g, '');
+      if (digits.length === 10) digits = `91${digits}`;
+      return digits;
+    };
+
+    // Build all message log entries as 'queued' (or 'scheduled' if future)
+    const isScheduled = scheduledAt && new Date(scheduledAt) > new Date();
+    const logsToInsert = recipients.map(recipient => {
+      const bodyParams = [];
+      if (recipient.params) {
+        if (Array.isArray(recipient.params)) {
+          bodyParams.push(...recipient.params);
+        } else {
+          bodyParams.push(...Object.values(recipient.params));
+        }
+      }
+
+      return {
+        recipientPhone: formatPhone(recipient.phone),
+        recipientName: recipient.name || '',
+        templateName,
+        messageType: 'campaign',
+        content: `Template: ${templateName} | Params: ${bodyParams.join(', ')}`,
+        status: isScheduled ? 'scheduled' : 'queued',
+        scheduledAt: isScheduled ? new Date(scheduledAt) : null,
+        campaignId,
+        campaignName: finalCampaignName,
+        bodyParams,
+        languageCode: languageCode || 'en',
+      };
+    });
+
+    // Insert all at once — instant, no timeout
+    await MessageLog.insertMany(logsToInsert);
 
     const summary = {
       campaignId,
       campaignName: finalCampaignName,
-      total: results.length,
-      sent: results.filter(r => r.success).length,
-      failed: results.filter(r => !r.success).length,
-      startedAt: new Date(),
+      total: logsToInsert.length,
+      status: isScheduled ? 'scheduled' : 'queued',
+      message: isScheduled
+        ? `${logsToInsert.length} messages scheduled for ${scheduledAt}`
+        : `${logsToInsert.length} messages queued for background processing`,
     };
 
-    res.json({ summary, results });
+    res.json({ summary });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -70,6 +96,8 @@ router.get('/history', async (req, res) => {
           campaignName: { $first: '$campaignName' },
           templateName: { $first: '$templateName' },
           totalMessages: { $sum: 1 },
+          queued: { $sum: { $cond: [{ $eq: ['$status', 'queued'] }, 1, 0] } },
+          scheduled: { $sum: { $cond: [{ $eq: ['$status', 'scheduled'] }, 1, 0] } },
           sent: { $sum: { $cond: [{ $eq: ['$status', 'sent'] }, 1, 0] } },
           delivered: { $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] } },
           read: { $sum: { $cond: [{ $eq: ['$status', 'read'] }, 1, 0] } },

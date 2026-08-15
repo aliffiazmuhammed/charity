@@ -111,3 +111,11 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-text-muted;
 }
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 4px;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+}

@@ -205,16 +205,68 @@ router.get('/messages/stats', auth, async (req, res) => {
 });
 
 /**
- * GET /api/whatsapp/messages/:id/status
- * Get delivery status of a specific message by its log ID.
+ * GET /api/whatsapp/usage
+ * Get today's messaging usage and limits.
  */
-router.get('/messages/:id/status', auth, async (req, res) => {
+router.get('/usage', auth, async (req, res) => {
   try {
-    const log = await MessageLog.findById(req.params.id).lean();
-    if (!log) {
-      return res.status(404).json({ error: 'Message not found' });
+    // Start of today (UTC)
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const [todayStats, allTimeStats, queuedCount] = await Promise.all([
+      // Today's breakdown by status
+      MessageLog.aggregate([
+        { $match: { createdAt: { $gte: todayStart } } },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      // All-time totals
+      MessageLog.aggregate([
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      // Currently queued
+      MessageLog.countDocuments({ status: 'queued' }),
+    ]);
+
+    // Parse today's stats
+    const today = { sent: 0, delivered: 0, read: 0, failed: 0, queued: 0, scheduled: 0, total: 0 };
+    for (const s of todayStats) {
+      today[s._id] = s.count;
+      today.total += s.count;
     }
-    res.json(log);
+
+    // Parse all-time stats
+    const allTime = { sent: 0, delivered: 0, read: 0, failed: 0, queued: 0, scheduled: 0, total: 0 };
+    for (const s of allTimeStats) {
+      allTime[s._id] = s.count;
+      allTime.total += s.count;
+    }
+
+    // Meta daily limit (user can update this via env var as their tier grows)
+    const dailyLimit = parseInt(process.env.WHATSAPP_DAILY_LIMIT) || 250;
+    const todaySent = today.sent + today.delivered + today.read;
+    const remaining = Math.max(0, dailyLimit - todaySent);
+
+    res.json({
+      dailyLimit,
+      today: {
+        ...today,
+        successfullySent: todaySent,
+        remaining,
+      },
+      allTime,
+      pendingInQueue: queuedCount,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
