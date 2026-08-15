@@ -3,16 +3,29 @@ import { format } from 'date-fns';
 import { Activity, RefreshCw } from 'lucide-react';
 import api from '../config/api';
 
-export default function MessageLogsTab() {
+export default function MessageLogsTab({ initialCampaignId }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [statusFilter, setStatusFilter] = useState('');
+  const [searchPhone, setSearchPhone] = useState('');
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (pageToFetch = pagination.page) => {
     setLoading(true);
     try {
-      const res = await api.get('/whatsapp/messages?limit=100');
+      let url = `/whatsapp/messages?limit=20&page=${pageToFetch}`;
+      if (initialCampaignId) url += `&campaignId=${initialCampaignId}`;
+      if (statusFilter) url += `&status=${statusFilter}`;
+      if (searchPhone) url += `&phone=${searchPhone}`;
+
+      const res = await api.get(url);
       setLogs(res.data.messages || []);
+      setPagination({
+        page: res.data.currentPage || 1,
+        totalPages: res.data.totalPages || 1,
+        total: res.data.total || 0
+      });
       setError(null);
     } catch (err) {
       console.error(err);
@@ -23,8 +36,8 @@ export default function MessageLogsTab() {
   };
 
   useEffect(() => {
-    fetchLogs();
-  }, []);
+    fetchLogs(1);
+  }, [initialCampaignId, statusFilter, searchPhone]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -41,17 +54,37 @@ export default function MessageLogsTab() {
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-6">
       <div className="bg-surface rounded-xl shadow-card border border-border-default overflow-hidden flex flex-col min-h-[500px]">
-        <div className="p-4 border-b border-border-default bg-warm-white flex justify-between items-center">
+        <div className="p-4 border-b border-border-default bg-warm-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h2 className="font-semibold text-text-primary flex items-center gap-2">
             <Activity size={20} className="text-primary" /> Message Logs
           </h2>
-          <button
-            onClick={fetchLogs}
-            disabled={loading}
-            className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded-md text-sm font-medium transition-colors disabled:opacity-70"
-          >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
-          </button>
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            <input
+              type="text"
+              placeholder="Search by phone..."
+              value={searchPhone}
+              onChange={(e) => setSearchPhone(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary w-full sm:w-auto"
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary w-full sm:w-auto bg-bg"
+            >
+              <option value="">All Statuses</option>
+              <option value="sent">Sent</option>
+              <option value="delivered">Delivered</option>
+              <option value="read">Read</option>
+              <option value="failed">Failed</option>
+            </select>
+            <button
+              onClick={() => fetchLogs(pagination.page)}
+              disabled={loading}
+              className="flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded-md text-sm font-medium transition-colors disabled:opacity-70 flex-shrink-0"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
+            </button>
+          </div>
         </div>
         
         {error ? (
@@ -107,6 +140,33 @@ export default function MessageLogsTab() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+        
+        {!error && logs.length > 0 && (
+          <div className="p-4 border-t border-border-default bg-warm-white flex items-center justify-between text-sm">
+            <div className="text-text-secondary">
+              Showing {logs.length} of {pagination.total} messages
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => fetchLogs(pagination.page - 1)}
+                disabled={pagination.page <= 1 || loading}
+                className="px-3 py-1 border border-border-strong rounded-md hover:bg-bg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-text-primary font-medium px-2">
+                Page {pagination.page} of {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => fetchLogs(pagination.page + 1)}
+                disabled={pagination.page >= pagination.totalPages || loading}
+                className="px-3 py-1 border border-border-strong rounded-md hover:bg-bg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

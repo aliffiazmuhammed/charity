@@ -2,17 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { getTemplates } from '../services/templateService';
 import { getCampaignHistory, sendCampaign } from '../services/campaignService';
 import { getAllDonors } from '../services/donorService';
-import { Upload, Users, Calendar, Send, BarChart2 } from 'lucide-react';
+import { Upload, Users, Calendar, Send, BarChart2, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
-export default function CampaignsTab() {
-  const [stats, setStats] = useState({ totalSent: 0, delivered: 0, read: 0, failed: 0 });
+export default function CampaignsTab({ onViewLogs }) {
   const [history, setHistory] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [donors, setDonors] = useState([]);
 
   const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [campaignName, setCampaignName] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
   
   // Recipients
@@ -21,6 +21,15 @@ export default function CampaignsTab() {
   // UI states
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [donorSearch, setDonorSearch] = useState('');
+  const [manualEntry, setManualEntry] = useState({ name: '', phone: '' });
+  const [showRecipientsModal, setShowRecipientsModal] = useState(false);
+
+  // History filters & pagination
+  const [campaignSearch, setCampaignSearch] = useState('');
+  const [campaignStatus, setCampaignStatus] = useState('');
+  const [campaignPage, setCampaignPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
     fetchData();
@@ -31,17 +40,7 @@ export default function CampaignsTab() {
       const histRes = await getCampaignHistory();
       const histData = histRes.data || histRes; // Handle if axios response or directly data
       
-      // Calculate stats based on history
-      let sent = 0, del = 0, rd = 0, fl = 0;
       const historyArr = Array.isArray(histData) ? histData : (histData.campaigns || []);
-      
-      historyArr.forEach(c => {
-        sent += (c.stats?.sent || 0);
-        del += (c.stats?.delivered || 0);
-        rd += (c.stats?.read || 0);
-        fl += (c.stats?.failed || 0);
-      });
-      setStats({ totalSent: sent, delivered: del, read: rd, failed: fl });
       setHistory(historyArr);
 
       const tpls = await getTemplates();
@@ -99,6 +98,21 @@ export default function CampaignsTab() {
     }
   };
 
+  const handleRemoveRecipient = (phone) => {
+    setRecipients(recipients.filter(r => r.phone !== phone));
+  };
+
+  const handleAddManual = () => {
+    if (!manualEntry.name || !manualEntry.phone) return;
+    setRecipients([...recipients, {
+      phone: manualEntry.phone.trim(),
+      name: manualEntry.name.trim(),
+      amount: '₹0',
+      date: format(new Date(), 'dd MMM yyyy')
+    }]);
+    setManualEntry({ name: '', phone: '' });
+  };
+
   const handleLaunch = async () => {
     if (!selectedTemplate) {
       setMessage('Please select a template.');
@@ -118,6 +132,7 @@ export default function CampaignsTab() {
     try {
       const payload = {
         templateName: tpl.metaTemplateName,
+        campaignName: campaignName.trim(),
         languageCode: tpl.language || 'en',
         recipients: recipients.map(r => ({
           phone: r.phone,
@@ -132,6 +147,7 @@ export default function CampaignsTab() {
       
       setRecipients([]);
       setScheduledAt('');
+      setCampaignName('');
       setSelectedTemplate('');
       fetchData();
     } catch (err) {
@@ -142,26 +158,28 @@ export default function CampaignsTab() {
     }
   };
 
+  // Filter and paginate history
+  const filteredHistory = history.filter(camp => {
+    const searchLower = campaignSearch.toLowerCase();
+    const nameMatch = (camp.campaignName || camp.campaignId || '').toLowerCase().includes(searchLower) ||
+                      (camp.templateName || '').toLowerCase().includes(searchLower);
+    
+    if (!nameMatch) return false;
+    
+    if (campaignStatus === 'success') return camp.failed === 0;
+    if (campaignStatus === 'failed') return camp.failed > 0;
+    return true; // 'all'
+  });
+
+  const totalCampaignPages = Math.max(1, Math.ceil(filteredHistory.length / ITEMS_PER_PAGE));
+  const paginatedHistory = filteredHistory.slice((campaignPage - 1) * ITEMS_PER_PAGE, campaignPage * ITEMS_PER_PAGE);
+
+  useEffect(() => {
+    setCampaignPage(1);
+  }, [campaignSearch, campaignStatus]);
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-surface p-4 rounded-xl shadow-sm border border-border-default">
-          <div className="text-sm text-text-secondary mb-1">Total Sent</div>
-          <div className="text-2xl font-bold text-text-primary">{stats.totalSent}</div>
-        </div>
-        <div className="bg-surface p-4 rounded-xl shadow-sm border border-border-default">
-          <div className="text-sm text-text-secondary mb-1">Delivered</div>
-          <div className="text-2xl font-bold text-success">{stats.delivered}</div>
-        </div>
-        <div className="bg-surface p-4 rounded-xl shadow-sm border border-border-default">
-          <div className="text-sm text-text-secondary mb-1">Read</div>
-          <div className="text-2xl font-bold text-info">{stats.read}</div>
-        </div>
-        <div className="bg-surface p-4 rounded-xl shadow-sm border border-border-default">
-          <div className="text-sm text-text-secondary mb-1">Failed</div>
-          <div className="text-2xl font-bold text-danger">{stats.failed}</div>
-        </div>
-      </div>
 
       <div className="bg-surface rounded-xl shadow-card border border-border-default overflow-hidden">
         <div className="p-4 border-b border-border-default bg-warm-white">
@@ -194,6 +212,17 @@ export default function CampaignsTab() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">Campaign Name (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="E.g., Onam Donation Drive 2026"
+                  value={campaignName}
+                  onChange={(e) => setCampaignName(e.target.value)}
+                  className="w-full px-4 py-2 border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg text-text-primary"
+                />
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">Schedule (Optional)</label>
                 <input
                   type="datetime-local"
@@ -215,6 +244,34 @@ export default function CampaignsTab() {
                   <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
                 </label>
               </div>
+
+              <div className="pt-4 border-t border-border-default">
+                <label className="block text-sm font-medium text-text-secondary mb-2">Or Add Manually</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Name"
+                    value={manualEntry.name}
+                    onChange={e => setManualEntry({...manualEntry, name: e.target.value})}
+                    className="flex-1 px-3 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Phone"
+                    value={manualEntry.phone}
+                    onChange={e => setManualEntry({...manualEntry, phone: e.target.value})}
+                    className="flex-1 px-3 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddManual}
+                    disabled={!manualEntry.name || !manualEntry.phone}
+                    className="px-4 py-1.5 bg-primary text-surface text-sm font-medium rounded-md hover:bg-primary-mid disabled:opacity-50"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4 flex flex-col">
@@ -231,10 +288,19 @@ export default function CampaignsTab() {
                     </span>
                   </div>
                 </div>
+                <div className="px-3 py-2 border-b border-border-strong bg-bg">
+                  <input
+                    type="text"
+                    placeholder="Search available donors..."
+                    value={donorSearch}
+                    onChange={e => setDonorSearch(e.target.value)}
+                    className="w-full px-3 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
                 <div className="flex-1 overflow-y-auto p-2">
-                  {donors.length === 0 ? (
+                  {donors.filter(d => (d.donorName || d.name || '').toLowerCase().includes(donorSearch.toLowerCase()) || (d.phone || '').includes(donorSearch)).length === 0 ? (
                     <div className="text-center text-text-muted py-4 text-sm">No donors found</div>
-                  ) : donors.map(donor => (
+                  ) : donors.filter(d => (d.donorName || d.name || '').toLowerCase().includes(donorSearch.toLowerCase()) || (d.phone || '').includes(donorSearch)).map(donor => (
                     <label key={donor.phone} className="flex items-center gap-3 p-2 hover:bg-bg rounded cursor-pointer transition-colors">
                       <input
                         type="checkbox"
@@ -252,8 +318,15 @@ export default function CampaignsTab() {
               </div>
               
               <div className="pt-4 border-t border-border-default flex items-center justify-between mt-auto">
-                <div className="text-sm font-medium text-text-primary">
-                  {recipients.length} Recipient(s) Selected
+                <div className="flex flex-col">
+                  <div className="text-sm font-medium text-text-primary">
+                    {recipients.length} Recipient(s) Selected
+                  </div>
+                  {recipients.length > 0 && (
+                    <button onClick={() => setShowRecipientsModal(true)} className="text-primary hover:underline text-xs text-left mt-0.5">
+                      View/Edit List
+                    </button>
+                  )}
                 </div>
                 <button
                   onClick={handleLaunch}
@@ -269,44 +342,78 @@ export default function CampaignsTab() {
       </div>
 
       <div className="bg-surface rounded-xl shadow-card border border-border-default overflow-hidden">
-        <div className="p-4 border-b border-border-default bg-warm-white">
+        <div className="p-4 border-b border-border-default bg-warm-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h2 className="font-semibold text-text-primary flex items-center gap-2">
             <BarChart2 size={20} className="text-primary" /> Campaign History
           </h2>
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            <input
+              type="text"
+              placeholder="Search campaigns..."
+              value={campaignSearch}
+              onChange={(e) => setCampaignSearch(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary w-full sm:w-auto bg-bg"
+            />
+            <select
+              value={campaignStatus}
+              onChange={(e) => setCampaignStatus(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary w-full sm:w-auto bg-bg"
+            >
+              <option value="">All Statuses</option>
+              <option value="success">Success</option>
+              <option value="failed">Failed</option>
+            </select>
+            <button
+              onClick={fetchData}
+              disabled={loading}
+              className="flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded-md text-sm font-medium transition-colors disabled:opacity-70 flex-shrink-0"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-bg text-text-secondary text-xs uppercase border-b border-border-default">
               <tr>
+                <th className="px-6 py-3 font-medium">Name</th>
                 <th className="px-6 py-3 font-medium">Template</th>
                 <th className="px-6 py-3 font-medium">Date</th>
                 <th className="px-6 py-3 font-medium">Recipients</th>
                 <th className="px-6 py-3 font-medium">Status</th>
+                <th className="px-6 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-              {history.length === 0 ? (
+              {paginatedHistory.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-text-muted">
-                    No campaigns launched yet.
+                  <td colSpan="6" className="px-6 py-8 text-center text-text-muted">
+                    No campaigns found.
                   </td>
                 </tr>
               ) : (
-                history.map((camp, idx) => (
+                paginatedHistory.map((camp, idx) => (
                   <tr key={idx} className="hover:bg-bg/50">
-                    <td className="px-6 py-4 text-text-primary font-medium">{camp.templateName || 'Unknown'}</td>
+                    <td className="px-6 py-4 text-text-primary font-medium">{camp.campaignName || camp.campaignId}</td>
+                    <td className="px-6 py-4 text-text-secondary">{camp.templateName || 'Unknown'}</td>
                     <td className="px-6 py-4 text-text-secondary">
                       {camp.scheduledAt ? format(new Date(camp.scheduledAt), 'dd MMM yyyy, HH:mm') : format(new Date(camp.createdAt || Date.now()), 'dd MMM yyyy, HH:mm')}
                     </td>
-                    <td className="px-6 py-4 text-text-secondary">{camp.recipientsCount || 0}</td>
+                    <td className="px-6 py-4 text-text-secondary">{camp.totalMessages || 0}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-full ${
-                        camp.status === 'COMPLETED' ? 'bg-success/20 text-success' :
-                        camp.status === 'FAILED' ? 'bg-danger/20 text-danger' :
-                        'bg-warning/20 text-warning'
+                        camp.failed > 0 ? 'bg-danger-bg text-danger' : 'bg-success-bg text-success'
                       }`}>
-                        {camp.status || 'PENDING'}
+                        {camp.failed > 0 ? `${camp.failed} Failed` : 'Success'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <button 
+                        onClick={() => onViewLogs && onViewLogs(camp.campaignId)}
+                        className="text-primary text-sm hover:underline font-medium"
+                      >
+                        View Logs
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -314,7 +421,65 @@ export default function CampaignsTab() {
             </tbody>
           </table>
         </div>
+        
+        {filteredHistory.length > 0 && (
+          <div className="p-4 border-t border-border-default bg-warm-white flex items-center justify-between text-sm">
+            <div className="text-text-secondary">
+              Showing {paginatedHistory.length} of {filteredHistory.length} campaigns
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCampaignPage(p => Math.max(1, p - 1))}
+                disabled={campaignPage <= 1}
+                className="px-3 py-1 border border-border-strong rounded-md hover:bg-bg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-text-primary font-medium px-2">
+                Page {campaignPage} of {totalCampaignPages}
+              </span>
+              <button
+                onClick={() => setCampaignPage(p => Math.min(totalCampaignPages, p + 1))}
+                disabled={campaignPage >= totalCampaignPages}
+                className="px-3 py-1 border border-border-strong rounded-md hover:bg-bg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {showRecipientsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-surface rounded-xl shadow-card w-full max-w-md max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b border-border-default flex justify-between items-center bg-warm-white rounded-t-xl">
+              <h3 className="font-semibold text-text-primary">Selected Recipients ({recipients.length})</h3>
+              <button onClick={() => setShowRecipientsModal(false)} className="text-text-muted hover:text-text-primary">
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {recipients.length === 0 ? (
+                <div className="text-center text-text-muted text-sm py-4">No recipients added yet.</div>
+              ) : recipients.map(r => (
+                <div key={r.phone} className="flex justify-between items-center p-2 bg-bg rounded-lg border border-border-default">
+                  <div>
+                    <div className="text-sm font-medium text-text-primary">{r.name}</div>
+                    <div className="text-xs text-text-muted">{r.phone}</div>
+                  </div>
+                  <button onClick={() => handleRemoveRecipient(r.phone)} className="text-danger hover:text-danger-dark text-xs font-medium">
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="p-4 border-t border-border-default bg-bg rounded-b-xl flex justify-end">
+               <button onClick={() => setShowRecipientsModal(false)} className="px-4 py-2 bg-primary hover:bg-primary-mid transition-colors text-white rounded-md text-sm">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

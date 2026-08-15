@@ -57,6 +57,10 @@ const messageLogSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    campaignName: {
+      type: String,
+      default: null,
+    },
     mediaUrl: {
       type: String,
       default: null,

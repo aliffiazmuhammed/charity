@@ -16,7 +16,7 @@ const router = express.Router();
  */
 router.post('/send', async (req, res) => {
   try {
-    const { templateName, languageCode, recipients, options, scheduledAt } = req.body;
+    const { templateName, languageCode, recipients, options, scheduledAt, campaignName } = req.body;
 
     if (!templateName) {
       return res.status(400).json({ error: 'templateName is required' });
@@ -26,12 +26,14 @@ router.post('/send', async (req, res) => {
     }
 
     const campaignId = `campaign_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const finalCampaignName = campaignName || `Campaign ${new Date().toLocaleString('en-IN')}`;
 
     const results = await sendBulkCampaignMessages(
       recipients,
       templateName,
       languageCode || 'en',
       campaignId,
+      finalCampaignName,
       options || {},
       2000,
       scheduledAt
@@ -39,6 +41,7 @@ router.post('/send', async (req, res) => {
 
     const summary = {
       campaignId,
+      campaignName: finalCampaignName,
       total: results.length,
       sent: results.filter(r => r.success).length,
       failed: results.filter(r => !r.success).length,
@@ -64,6 +67,7 @@ router.get('/history', async (req, res) => {
         $group: {
           _id: '$campaignId',
           campaignId: { $first: '$campaignId' },
+          campaignName: { $first: '$campaignName' },
           templateName: { $first: '$templateName' },
           totalMessages: { $sum: 1 },
           sent: { $sum: { $cond: [{ $eq: ['$status', 'sent'] }, 1, 0] } },

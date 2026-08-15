@@ -224,7 +224,7 @@ export const sendMediaMessage = async (phone, mediaType, mediaUrl, caption = '',
  * @param {Object} [options] - Media header options
  * @param {number} [delayMs=2000] - Delay between messages in ms
  */
-export const sendBulkCampaignMessages = async (recipients, templateName, languageCode = 'en', campaignId, options = {}, delayMs = 2000, scheduledAt = null) => {
+export const sendBulkCampaignMessages = async (recipients, templateName, languageCode = 'en', campaignId, campaignName, options = {}, delayMs = 2000, scheduledAt = null) => {
   if (scheduledAt && new Date(scheduledAt) > new Date()) {
     const logsToInsert = recipients.map(recipient => {
       const bodyParams = [];
@@ -245,6 +245,7 @@ export const sendBulkCampaignMessages = async (recipients, templateName, languag
         status: 'scheduled',
         scheduledAt: new Date(scheduledAt),
         campaignId,
+        campaignName,
         bodyParams,
         languageCode,
       };
@@ -293,6 +294,7 @@ export const sendBulkCampaignMessages = async (recipients, templateName, languag
           messageType: 'campaign',
           recipientName: recipient.name || '',
           campaignId,
+          campaignName,
         }
       );
 
