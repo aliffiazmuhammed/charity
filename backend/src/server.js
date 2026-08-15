@@ -1,16 +1,17 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { connectDB } from './config/db.js';
 import { auth } from './middleware/auth.js';
-import { initWhatsApp } from './services/whatsappService.js';
+import campaignRoutes from './routes/campaignRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import donationRoutes from './routes/donationRoutes.js';
 import donorRoutes from './routes/donorRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 import templateRoutes from './routes/templateRoutes.js';
+import { startCampaignScheduler } from './services/campaignScheduler.js';
 
-dotenv.config();
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,9 +19,8 @@ const PORT = process.env.PORT || 5000;
 // Connect to MongoDB (wait for it to finish)
 await connectDB();
 
-// Initialize WhatsApp client (non-blocking — runs in background)
-// QR code will appear in terminal on first run
-initWhatsApp();
+// Start background workers
+startCampaignScheduler();
 
 // Middleware
 app.use(cors());
@@ -43,6 +43,7 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/donations', auth, donationRoutes);
 app.use('/api/donors', auth, donorRoutes);
 app.use('/api/templates', auth, templateRoutes);
+app.use('/api/campaigns', auth, campaignRoutes);
 
 // ── Global Error Handler ────────────────────────────────────────────
 

@@ -94,17 +94,13 @@ router.post('/', validateDonation, async (req, res) => {
 
     // ── Fire-and-forget WhatsApp thank-you ────────────────────────────
     // Runs asynchronously — a WhatsApp failure will NEVER block the save.
-    // Fetch the active template; if none exists, no message is sent.
-    getActiveTemplate().then((template) => {
-      sendThankYouMessage(
-        newDonation.phone,
-        newDonation.donorName,
-        newDonation.amount,
-        newDonation.date,
-        template?.body
-      );
-    }).catch((err) => {
-      console.error('[Donation] Failed to fetch active template:', err.message);
+    sendThankYouMessage(
+      newDonation.phone,
+      newDonation.donorName,
+      newDonation.amount,
+      newDonation.date
+    ).catch((err) => {
+      console.error('[Donation] Failed to send thank-you message:', err.message);
     });
 
     res.status(201).json(newDonation);

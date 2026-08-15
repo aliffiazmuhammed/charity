@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { MessageSquareText, Plus, Check, Edit2, Trash2, X, PlayCircle, Info } from 'lucide-react';
+import { MessageSquareText, Plus, Check, Edit2, Trash2, X, PlayCircle, Info, RefreshCw, Send } from 'lucide-react';
 import {
   getTemplates,
   createTemplate,
   updateTemplate,
   activateTemplate,
-  deleteTemplate
+  deleteTemplate,
+  syncMetaTemplates,
+  submitToMeta
 } from '../services/templateService';
 
 export default function MessageTemplatesTab() {
@@ -17,8 +19,9 @@ export default function MessageTemplatesTab() {
   
   // Editor State
   const [isEditing, setIsEditing] = useState(false);
-  const [currentTemplate, setCurrentTemplate] = useState({ name: '', body: '', isActive: false });
+  const [currentTemplate, setCurrentTemplate] = useState({ name: '', body: '', isActive: false, metaTemplateName: '', language: 'en', metaCategory: 'UTILITY' });
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const textareaRef = useRef(null);
 
@@ -40,50 +43,78 @@ export default function MessageTemplatesTab() {
   };
 
   const handleCreateNew = () => {
-    setCurrentTemplate({ name: '', body: '', isActive: false });
+    setCurrentTemplate({ name: '', body: '', isActive: false, metaTemplateName: '', language: 'en', metaCategory: 'UTILITY' });
     setIsEditing(true);
     setErrorMsg('');
   };
 
   const handleEdit = (template) => {
-    setCurrentTemplate({ ...template });
+    setCurrentTemplate({ metaTemplateName: '', language: 'en', metaCategory: 'UTILITY', ...template });
     setIsEditing(true);
     setErrorMsg('');
   };
 
   const handleCancelEdit = () => {
     setIsEditing(false);
-    setCurrentTemplate({ name: '', body: '', isActive: false });
+    setCurrentTemplate({ name: '', body: '', isActive: false, metaTemplateName: '', language: 'en', metaCategory: 'UTILITY' });
     setErrorMsg('');
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!currentTemplate.name.trim() || !currentTemplate.body.trim()) {
-      setErrorMsg('Name and body are required.');
+    if (!currentTemplate.name.trim() || !currentTemplate.body.trim() || !currentTemplate.metaTemplateName?.trim()) {
+      setErrorMsg('Name, Template Name (Meta), and body are required.');
       return;
     }
     
     setIsSaving(true);
     setErrorMsg('');
     try {
+      const templateData = {
+        name: currentTemplate.name,
+        body: currentTemplate.body,
+        isActive: currentTemplate.isActive,
+        metaTemplateName: currentTemplate.metaTemplateName,
+        language: currentTemplate.language,
+        metaCategory: currentTemplate.metaCategory
+      };
+
       if (currentTemplate._id) {
-        await updateTemplate(currentTemplate._id, {
-          name: currentTemplate.name,
-          body: currentTemplate.body,
-          isActive: currentTemplate.isActive
-        });
+        await updateTemplate(currentTemplate._id, templateData);
       } else {
-        await createTemplate({
-          name: currentTemplate.name,
-          body: currentTemplate.body,
-          isActive: currentTemplate.isActive
-        });
+        await createTemplate(templateData);
       }
       await fetchTemplates();
       setIsEditing(false);
     } catch (err) {
       setErrorMsg(err.response?.data?.error || 'Failed to save template.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSyncMeta = async () => {
+    setIsSyncing(true);
+    try {
+      await syncMetaTemplates();
+      await fetchTemplates();
+    } catch (err) {
+      setErrorMsg('Failed to sync templates with Meta.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSubmitToMeta = async (e) => {
+    if (e) e.preventDefault();
+    if (!currentTemplate._id) return;
+    setIsSaving(true);
+    try {
+      await submitToMeta(currentTemplate._id);
+      await fetchTemplates();
+      setIsEditing(false);
+    } catch (err) {
+      setErrorMsg('Failed to submit template to Meta.');
     } finally {
       setIsSaving(false);
     }
@@ -161,12 +192,22 @@ export default function MessageTemplatesTab() {
             <MessageSquareText size={20} className="text-primary" />
             <h2 className="font-semibold">Templates</h2>
           </div>
-          <button
-            onClick={handleCreateNew}
-            className="flex items-center gap-1 px-3 py-1.5 bg-primary-light text-primary hover:bg-primary hover:text-white rounded-md text-sm font-medium transition-colors"
-          >
-            <Plus size={16} /> New
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSyncMeta}
+              disabled={isSyncing}
+              title="Sync with Meta"
+              className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded-md transition-colors disabled:opacity-70"
+            >
+              <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
+            </button>
+            <button
+              onClick={handleCreateNew}
+              className="flex items-center gap-1 px-3 py-1.5 bg-primary-light text-primary hover:bg-primary hover:text-white rounded-md text-sm font-medium transition-colors"
+            >
+              <Plus size={16} /> New
+            </button>
+          </div>
         </div>
         
         <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
@@ -178,18 +219,31 @@ export default function MessageTemplatesTab() {
             templates.map(template => (
               <motion.div
                 key={template._id}
+                onClick={() => !isEditing && setCurrentTemplate(template)}
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`p-4 rounded-lg border transition-all ${
+                className={`p-4 rounded-lg border transition-all cursor-pointer ${
                   template.isActive 
                     ? 'border-success bg-success-bg/30 shadow-sm' 
                     : 'border-border-default bg-bg hover:border-primary/50'
                 } ${currentTemplate._id === template._id ? 'ring-1 ring-primary/50' : ''}`}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-medium text-text-primary truncate pr-2" title={template.name}>
-                    {template.name}
-                  </h3>
+                  <div className="flex flex-col gap-1 pr-2">
+                    <h3 className="font-medium text-text-primary truncate" title={template.name}>
+                      {template.name}
+                    </h3>
+                    {template.metaStatus && (
+                      <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full self-start ${
+                        template.metaStatus.toUpperCase() === 'APPROVED' ? 'bg-success/20 text-success' :
+                        template.metaStatus.toUpperCase() === 'PENDING' ? 'bg-warning/20 text-warning' :
+                        template.metaStatus.toUpperCase() === 'REJECTED' ? 'bg-danger/20 text-danger' :
+                        'bg-border-strong text-text-secondary'
+                      }`}>
+                        Meta: {template.metaStatus}
+                      </span>
+                    )}
+                  </div>
                   {template.isActive && (
                     <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold bg-success text-white px-2 py-0.5 rounded-full shrink-0">
                       <Check size={10} strokeWidth={3} /> Active
@@ -202,14 +256,14 @@ export default function MessageTemplatesTab() {
                 <div className="flex justify-between items-center border-t border-border-strong/50 pt-3">
                   <div className="flex gap-2">
                     <button 
-                      onClick={() => handleEdit(template)}
+                      onClick={(e) => { e.stopPropagation(); handleEdit(template); }}
                       className="p-1.5 text-text-muted hover:text-primary hover:bg-primary-light rounded transition-colors"
                       title="Edit"
                     >
                       <Edit2 size={14} />
                     </button>
                     <button 
-                      onClick={() => handleDelete(template._id)}
+                      onClick={(e) => { e.stopPropagation(); handleDelete(template._id); }}
                       className="p-1.5 text-text-muted hover:text-danger hover:bg-danger-bg rounded transition-colors"
                       title="Delete"
                     >
@@ -218,7 +272,7 @@ export default function MessageTemplatesTab() {
                   </div>
                   {!template.isActive && (
                     <button 
-                      onClick={() => handleActivate(template._id)}
+                      onClick={(e) => { e.stopPropagation(); handleActivate(template._id); }}
                       className="text-xs font-medium text-text-secondary hover:text-success border border-border-strong hover:border-success px-2 py-1 rounded transition-colors"
                     >
                       Set Active
@@ -260,7 +314,7 @@ export default function MessageTemplatesTab() {
 
               <form onSubmit={handleSave} className="flex flex-col gap-5 flex-1">
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1">Template Name *</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">Display Name *</label>
                   <input
                     type="text"
                     required
@@ -269,6 +323,42 @@ export default function MessageTemplatesTab() {
                     placeholder="e.g. Formal Thank You"
                     className="w-full px-4 py-2 border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg text-text-primary"
                   />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm font-medium text-text-secondary mb-1">Meta Template Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={currentTemplate.metaTemplateName || ''}
+                      onChange={e => setCurrentTemplate({...currentTemplate, metaTemplateName: e.target.value})}
+                      placeholder="e.g. formal_thank_you"
+                      className="w-full px-4 py-2 border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg text-text-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-1">Language</label>
+                    <select
+                      value={currentTemplate.language || 'en'}
+                      onChange={e => setCurrentTemplate({...currentTemplate, language: e.target.value})}
+                      className="w-full px-4 py-2 border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg text-text-primary"
+                    >
+                      <option value="en">English (en)</option>
+                      <option value="ml">Malayalam (ml)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-1">Category</label>
+                    <select
+                      value={currentTemplate.metaCategory || 'UTILITY'}
+                      onChange={e => setCurrentTemplate({...currentTemplate, metaCategory: e.target.value})}
+                      className="w-full px-4 py-2 border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg text-text-primary"
+                    >
+                      <option value="UTILITY">UTILITY</option>
+                      <option value="MARKETING">MARKETING</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="flex flex-col flex-1">
@@ -309,21 +399,45 @@ export default function MessageTemplatesTab() {
                    </label>
                 </div>
 
-                <div className="pt-4 flex justify-end gap-3 mt-auto border-t border-border-default pt-4">
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="px-6 py-2 bg-primary hover:bg-primary-mid text-surface text-sm font-medium rounded-md shadow-sm transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-                  >
-                    {isSaving ? 'Saving...' : 'Save Template'}
-                  </button>
+                <div className="pt-4 flex justify-between gap-3 mt-auto border-t border-border-default pt-4">
+                  <div className="flex gap-2">
+                    {currentTemplate._id && (!currentTemplate.metaStatus || currentTemplate.metaStatus.toUpperCase() === 'DRAFT' || currentTemplate.metaStatus.toUpperCase() === 'REJECTED') && (
+                      <button
+                        type="button"
+                        onClick={handleSubmitToMeta}
+                        disabled={isSaving}
+                        className="flex items-center gap-1 px-4 py-2 text-sm font-medium bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 rounded-md transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                      >
+                        <Send size={16} /> Submit to Meta
+                      </button>
+                    )}
+                    {currentTemplate._id && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(currentTemplate._id)}
+                        disabled={isSaving}
+                        className="flex items-center gap-1 px-4 py-2 text-sm font-medium bg-danger-bg text-danger border border-danger/20 hover:bg-danger/10 rounded-md transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 size={16} /> Delete
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSaving}
+                      className="px-6 py-2 bg-primary hover:bg-primary-mid text-surface text-sm font-medium rounded-md shadow-sm transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? 'Saving...' : 'Save Template'}
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
@@ -340,6 +454,26 @@ export default function MessageTemplatesTab() {
                   {/* Fake WhatsApp tail */}
                   <div className="absolute top-0 -left-2 w-0 h-0 border-t-[0px] border-t-transparent border-r-[12px] border-r-white border-b-[12px] border-b-transparent"></div>
                 </div>
+              </div>
+            </div>
+          </div>
+        ) : currentTemplate._id ? (
+          <div className="flex flex-col h-full bg-[#EFEAE2]">
+            <div className="p-4 border-b border-border-default bg-warm-white flex justify-between items-center">
+              <h2 className="font-semibold text-text-primary flex items-center gap-2">
+                Template Preview
+              </h2>
+              <button
+                onClick={() => handleEdit(currentTemplate)}
+                className="flex items-center gap-1 px-4 py-1.5 bg-primary text-surface hover:bg-primary-mid rounded-md text-sm font-medium transition-colors"
+              >
+                <Edit2 size={14} /> Edit Template
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-8 flex justify-center items-start">
+              <div className="bg-white rounded-xl rounded-tl-sm shadow-sm p-4 inline-block max-w-md w-full relative border border-black/5 whitespace-pre-wrap text-[#111B21]">
+                {generatePreview(currentTemplate.body)}
+                <div className="absolute top-0 -left-2 w-0 h-0 border-t-[0px] border-t-transparent border-r-[12px] border-r-white border-b-[12px] border-b-transparent"></div>
               </div>
             </div>
           </div>

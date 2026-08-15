@@ -24,3 +24,13 @@ export const deleteTemplate = async (id) => {
   const response = await api.delete(`/templates/${id}`);
   return response.data;
 };
+
+export const syncMetaTemplates = async () => {
+  const response = await api.post('/templates/sync-meta');
+  return response.data;
+};
+
+export const submitToMeta = async (id) => {
+  const response = await api.post(`/templates/${id}/submit-to-meta`);
+  return response.data;
+};

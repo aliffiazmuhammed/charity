@@ -18,6 +18,58 @@ const messageTemplateSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // --- Meta WhatsApp Business API fields ---
+    metaTemplateName: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    metaStatus: {
+      type: String,
+      enum: ['draft', 'pending', 'approved', 'rejected', 'disabled', null],
+      default: 'draft',
+    },
+    metaRejectedReason: {
+      type: String,
+      default: null,
+    },
+    language: {
+      type: String,
+      default: 'en',
+    },
+    metaCategory: {
+      type: String,
+      enum: ['UTILITY', 'MARKETING', 'AUTHENTICATION'],
+      default: 'UTILITY',
+    },
+    category: {
+      type: String,
+      enum: ['thank_you', 'reminder', 'greeting', 'campaign', 'custom'],
+      default: 'custom',
+    },
+    headerType: {
+      type: String,
+      enum: ['none', 'text', 'image', 'document', 'video'],
+      default: 'none',
+    },
+    headerContent: {
+      type: String,
+      default: null,
+    },
+    footerText: {
+      type: String,
+      default: null,
+    },
+    buttons: [{
+      type: { type: String, enum: ['QUICK_REPLY', 'URL', 'PHONE_NUMBER'] },
+      text: String,
+      url: String,
+      phoneNumber: String,
+    }],
+    isSyncedToMeta: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

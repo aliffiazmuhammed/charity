@@ -8,6 +8,13 @@ import {
   setActiveTemplate,
   deleteTemplate,
 } from '../services/templateService.js';
+import {
+  submitTemplateToMeta,
+  checkTemplateStatus,
+  syncAllTemplateStatuses,
+  deleteMetaTemplate,
+} from '../services/metaTemplateService.js';
+import { MessageTemplate } from '../models/MessageTemplate.js';
 
 const router = express.Router();
 
@@ -41,18 +48,31 @@ router.get('/active', async (req, res) => {
 });
 
 /**
+ * POST /api/templates/sync-meta
+ * Sync all template statuses from Meta to local DB.
+ */
+router.post('/sync-meta', async (req, res) => {
+  try {
+    const results = await syncAllTemplateStatuses();
+    res.json({ message: `Synced ${results.length} templates`, results });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/templates
  * Create a new message template.
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, body, isActive } = req.body;
+    const { name, body, isActive, metaTemplateName, language, metaCategory } = req.body;
 
     if (!name || !body) {
       return res.status(400).json({ error: 'Template name and body are required' });
     }
 
-    const template = await createTemplate({ name, body, isActive });
+    const template = await createTemplate({ name, body, isActive, metaTemplateName, language, metaCategory });
     res.status(201).json(template);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -65,8 +85,8 @@ router.post('/', async (req, res) => {
  */
 router.put('/:id', async (req, res) => {
   try {
-    const { name, body, isActive } = req.body;
-    const template = await updateTemplate(req.params.id, { name, body, isActive });
+    const { name, body, isActive, metaTemplateName, language, metaCategory } = req.body;
+    const template = await updateTemplate(req.params.id, { name, body, isActive, metaTemplateName, language, metaCategory });
     res.json(template);
   } catch (error) {
     const status = error.message === 'Template not found' ? 404 : 400;
@@ -99,6 +119,46 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     const status = error.message === 'Template not found' ? 404 : 400;
     res.status(status).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/templates/:id/submit-to-meta
+ * Submit a local template to Meta for approval.
+ */
+router.post('/:id/submit-to-meta', async (req, res) => {
+  try {
+    const result = await submitTemplateToMeta(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/templates/:id/meta-status
+ * Check the Meta approval status for a template.
+ */
+router.get('/:id/meta-status', async (req, res) => {
+  try {
+    const template = await MessageTemplate.findById(req.params.id);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    if (!template.metaTemplateName) {
+      return res.status(400).json({ error: 'Template has not been submitted to Meta yet' });
+    }
+    const status = await checkTemplateStatus(template.metaTemplateName);
+
+    // Update local status
+    if (status.status !== 'NOT_FOUND') {
+      template.metaStatus = status.status.toLowerCase();
+      await template.save();
+    }
+
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

@@ -1,39 +1,33 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '../config/api';
-import { MessageCircle, ScanQrCode } from 'lucide-react';
-import WhatsAppQRModal from './WhatsAppQRModal';
+import { MessageCircle } from 'lucide-react';
 
 const WA_STATUS_LABELS = {
-  READY: 'WhatsApp Connected',
-  AUTHENTICATED: 'WhatsApp Authenticating...',
-  QR_READY: 'Scan QR in Terminal',
-  DISCONNECTED: 'WhatsApp Offline',
-  AUTH_FAILURE: 'WhatsApp Auth Failed',
+  CONNECTED: 'Meta Connected',
+  DISCONNECTED: 'Meta Disconnected',
+  ERROR: 'Meta Error',
+  NOT_CONFIGURED: 'Not Configured',
 };
 
 const WA_STATUS_STYLES = {
-  READY: 'bg-success-bg text-success border-success/20',
-  AUTHENTICATED: 'bg-info-bg text-info border-info/20',
-  QR_READY: 'bg-warning-bg text-warning border-warning/20',
+  CONNECTED: 'bg-success-bg text-success border-success/20',
   DISCONNECTED: 'bg-danger-bg text-danger border-danger/20',
-  AUTH_FAILURE: 'bg-danger-bg text-danger border-danger/20',
+  ERROR: 'bg-danger-bg text-danger border-danger/20',
+  NOT_CONFIGURED: 'bg-warning-bg text-warning border-warning/20',
 };
 
 export default function Header({ onLogout }) {
   const [waStatus, setWaStatus] = useState('DISCONNECTED');
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [waMessage, setWaMessage] = useState('');
 
   const fetchWAStatus = useCallback(async () => {
     try {
       const res = await api.get('/whatsapp/status');
       setWaStatus(res.data.status);
-      
-      // Auto-close modal if status changes from QR_READY to AUTHENTICATED/READY
-      if (res.data.status === 'AUTHENTICATED' || res.data.status === 'READY') {
-        setIsQrModalOpen(false);
-      }
-    } catch {
+      setWaMessage(res.data.message || '');
+    } catch (err) {
       setWaStatus('DISCONNECTED');
+      setWaMessage('Failed to connect to backend server');
     }
   }, []);
 
@@ -57,43 +51,17 @@ export default function Header({ onLogout }) {
       {/* Right side */}
       <div className="flex items-center gap-4">
         {/* WhatsApp status pill */}
-        <button
-          onClick={async () => {
-            if (waStatus === 'QR_READY') {
-              setIsQrModalOpen(true);
-            } else if (waStatus === 'READY') {
-              if (window.confirm('Disconnect the current WhatsApp account? You will need to scan a new QR code.')) {
-                try {
-                  setWaStatus('DISCONNECTED'); // Optimistic update
-                  await api.post('/whatsapp/logout');
-                  fetchWAStatus(); // Fetch new status immediately
-                } catch (error) {
-                  console.error('Failed to logout WhatsApp', error);
-                  alert('Failed to disconnect WhatsApp. Please try again.');
-                  fetchWAStatus(); // Revert optimistic update
-                }
-              }
-            }
-          }}
-          disabled={!['QR_READY', 'READY'].includes(waStatus)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${statusStyle} ${
-            ['QR_READY', 'READY'].includes(waStatus) ? 'hover:scale-105 cursor-pointer shadow-sm' : 'cursor-default'
-          }`}
-          title={
-            waStatus === 'QR_READY' 
-              ? 'Click to scan QR code' 
-              : waStatus === 'READY' 
-                ? 'Click to disconnect WhatsApp' 
-                : ''
-          }
+        <div
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${statusStyle} cursor-help`}
+          title={waStatus === 'CONNECTED' ? 'Meta API is online' : waMessage || 'Meta API is offline'}
         >
-          {waStatus === 'QR_READY' ? <ScanQrCode size={13} /> : <MessageCircle size={13} />}
+          <MessageCircle size={13} />
           <span>{statusLabel}</span>
           {/* Pulsing dot for live states */}
-          {(waStatus === 'QR_READY' || waStatus === 'AUTHENTICATED') && (
+          {waStatus === 'CONNECTED' && (
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse ml-0.5" />
           )}
-        </button>
+        </div>
 
         {/* Logout */}
         <button
@@ -104,13 +72,6 @@ export default function Header({ onLogout }) {
         </button>
       </div>
 
-      <WhatsAppQRModal 
-        isOpen={isQrModalOpen} 
-        onClose={() => {
-          setIsQrModalOpen(false);
-          fetchWAStatus();
-        }} 
-      />
     </div>
   );
 }

@@ -1,0 +1,320 @@
+import React, { useState, useEffect } from 'react';
+import { getTemplates } from '../services/templateService';
+import { getCampaignHistory, sendCampaign } from '../services/campaignService';
+import { getAllDonors } from '../services/donorService';
+import { Upload, Users, Calendar, Send, BarChart2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
+
+export default function CampaignsTab() {
+  const [stats, setStats] = useState({ totalSent: 0, delivered: 0, read: 0, failed: 0 });
+  const [history, setHistory] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [donors, setDonors] = useState([]);
+
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [scheduledAt, setScheduledAt] = useState('');
+  
+  // Recipients
+  const [recipients, setRecipients] = useState([]); // [{phone, name, amount, date}]
+  
+  // UI states
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const histRes = await getCampaignHistory();
+      const histData = histRes.data || histRes; // Handle if axios response or directly data
+      
+      // Calculate stats based on history
+      let sent = 0, del = 0, rd = 0, fl = 0;
+      const historyArr = Array.isArray(histData) ? histData : (histData.campaigns || []);
+      
+      historyArr.forEach(c => {
+        sent += (c.stats?.sent || 0);
+        del += (c.stats?.delivered || 0);
+        rd += (c.stats?.read || 0);
+        fl += (c.stats?.failed || 0);
+      });
+      setStats({ totalSent: sent, delivered: del, read: rd, failed: fl });
+      setHistory(historyArr);
+
+      const tpls = await getTemplates();
+      // Only approved templates
+      setTemplates(tpls.filter(t => t.metaStatus === 'APPROVED' || t.metaStatus === 'approved'));
+
+      const dns = await getAllDonors({ limit: 10000 });
+      setDonors(dns.donors || dns || []);
+    } catch (err) {
+      console.error(err);
+      setMessage('Failed to load data.');
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+      
+      // Map data to recipients
+      const newRecs = data.map(row => ({
+        phone: String(row.phone || row.Phone || row.PHONE || '').trim(),
+        name: row.name || row.Name || row.NAME || 'Donor',
+        amount: String(row.amount || row.Amount || row.AMOUNT || '₹0'),
+        date: String(row.date || row.Date || row.DATE || format(new Date(), 'dd MMM yyyy'))
+      })).filter(r => r.phone);
+      
+      setRecipients(prev => {
+        const existingPhones = new Set(prev.map(p => p.phone));
+        const filteredNew = newRecs.filter(r => !existingPhones.has(r.phone));
+        return [...prev, ...filteredNew];
+      });
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = null;
+  };
+
+  const handleDonorSelect = (donor) => {
+    if (recipients.some(r => r.phone === donor.phone)) {
+      setRecipients(recipients.filter(r => r.phone !== donor.phone));
+    } else {
+      setRecipients([...recipients, {
+        phone: donor.phone,
+        name: donor.donorName || donor.name || 'Unknown',
+        amount: '₹0',
+        date: format(new Date(), 'dd MMM yyyy')
+      }]);
+    }
+  };
+
+  const handleLaunch = async () => {
+    if (!selectedTemplate) {
+      setMessage('Please select a template.');
+      return;
+    }
+    if (recipients.length === 0) {
+      setMessage('Please add at least one recipient.');
+      return;
+    }
+
+    const tpl = templates.find(t => t._id === selectedTemplate);
+    if (!tpl) return;
+
+    setLoading(true);
+    setMessage('');
+
+    try {
+      const payload = {
+        templateName: tpl.metaTemplateName,
+        languageCode: tpl.language || 'en',
+        recipients: recipients.map(r => ({
+          phone: r.phone,
+          name: r.name,
+          params: [r.name, r.amount, r.date]
+        })),
+        scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null
+      };
+
+      await sendCampaign(payload);
+      setMessage('Campaign launched successfully!');
+      
+      setRecipients([]);
+      setScheduledAt('');
+      setSelectedTemplate('');
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      setMessage('Failed to launch campaign.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-6 pb-12">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-surface p-4 rounded-xl shadow-sm border border-border-default">
+          <div className="text-sm text-text-secondary mb-1">Total Sent</div>
+          <div className="text-2xl font-bold text-text-primary">{stats.totalSent}</div>
+        </div>
+        <div className="bg-surface p-4 rounded-xl shadow-sm border border-border-default">
+          <div className="text-sm text-text-secondary mb-1">Delivered</div>
+          <div className="text-2xl font-bold text-success">{stats.delivered}</div>
+        </div>
+        <div className="bg-surface p-4 rounded-xl shadow-sm border border-border-default">
+          <div className="text-sm text-text-secondary mb-1">Read</div>
+          <div className="text-2xl font-bold text-info">{stats.read}</div>
+        </div>
+        <div className="bg-surface p-4 rounded-xl shadow-sm border border-border-default">
+          <div className="text-sm text-text-secondary mb-1">Failed</div>
+          <div className="text-2xl font-bold text-danger">{stats.failed}</div>
+        </div>
+      </div>
+
+      <div className="bg-surface rounded-xl shadow-card border border-border-default overflow-hidden">
+        <div className="p-4 border-b border-border-default bg-warm-white">
+          <h2 className="font-semibold text-text-primary flex items-center gap-2">
+            <Send size={20} className="text-primary" /> Campaign Builder
+          </h2>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {message && (
+            <div className={`p-3 rounded-lg text-sm ${message.includes('success') ? 'bg-success-bg text-success border-success/20' : 'bg-danger-bg text-danger border-danger/20'} border`}>
+              {message}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">Select Template *</label>
+                <select
+                  value={selectedTemplate}
+                  onChange={(e) => setSelectedTemplate(e.target.value)}
+                  className="w-full px-4 py-2 border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg text-text-primary"
+                >
+                  <option value="">-- Choose an approved template --</option>
+                  {templates.map(t => (
+                    <option key={t._id} value={t._id}>{t.name} ({t.metaTemplateName})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">Schedule (Optional)</label>
+                <input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                  className="w-full px-4 py-2 border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg text-text-primary"
+                />
+                <p className="text-xs text-text-muted mt-1">Leave blank to send immediately.</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">Upload Recipients (.xlsx)</label>
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border-strong rounded-lg cursor-pointer bg-bg hover:bg-bg/50 transition-colors">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <Upload className="w-8 h-8 mb-2 text-text-muted" />
+                    <p className="text-sm text-text-secondary"><span className="font-semibold">Click to upload</span></p>
+                    <p className="text-xs text-text-muted text-center px-4 mt-1">Columns: phone, name, amount (optional), date (optional)</p>
+                  </div>
+                  <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
+                </label>
+              </div>
+            </div>
+
+            <div className="space-y-4 flex flex-col">
+              <label className="block text-sm font-medium text-text-secondary mb-1">Or Select Existing Donors</label>
+              <div className="flex-1 border border-border-strong rounded-md overflow-hidden flex flex-col min-h-[250px] max-h-[300px]">
+                <div className="bg-warm-white px-4 py-2 border-b border-border-strong text-xs font-semibold text-text-secondary flex justify-between items-center">
+                  <span>Available Donors</span>
+                  <div className="flex gap-3">
+                    <span className="text-primary cursor-pointer hover:underline" onClick={() => setRecipients(donors.map(d => ({phone: d.phone, name: d.donorName || d.name || 'Unknown', amount: '₹0', date: format(new Date(), 'dd MMM yyyy')})))}>
+                      Select All
+                    </span>
+                    <span className="text-primary cursor-pointer hover:underline" onClick={() => setRecipients([])}>
+                      Deselect All
+                    </span>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2">
+                  {donors.length === 0 ? (
+                    <div className="text-center text-text-muted py-4 text-sm">No donors found</div>
+                  ) : donors.map(donor => (
+                    <label key={donor.phone} className="flex items-center gap-3 p-2 hover:bg-bg rounded cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={recipients.some(r => r.phone === donor.phone)}
+                        onChange={() => handleDonorSelect(donor)}
+                        className="text-primary focus:ring-primary w-4 h-4 rounded border-border-strong"
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-text-primary">{donor.donorName || donor.name || 'Unknown'}</span>
+                        <span className="text-xs text-text-muted">{donor.phone}</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="pt-4 border-t border-border-default flex items-center justify-between mt-auto">
+                <div className="text-sm font-medium text-text-primary">
+                  {recipients.length} Recipient(s) Selected
+                </div>
+                <button
+                  onClick={handleLaunch}
+                  disabled={loading || !selectedTemplate || recipients.length === 0}
+                  className="flex items-center gap-2 px-6 py-2 bg-primary hover:bg-primary-mid text-surface text-sm font-medium rounded-md shadow-sm transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Launching...' : 'Launch Campaign'} <Send size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-surface rounded-xl shadow-card border border-border-default overflow-hidden">
+        <div className="p-4 border-b border-border-default bg-warm-white">
+          <h2 className="font-semibold text-text-primary flex items-center gap-2">
+            <BarChart2 size={20} className="text-primary" /> Campaign History
+          </h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-bg text-text-secondary text-xs uppercase border-b border-border-default">
+              <tr>
+                <th className="px-6 py-3 font-medium">Template</th>
+                <th className="px-6 py-3 font-medium">Date</th>
+                <th className="px-6 py-3 font-medium">Recipients</th>
+                <th className="px-6 py-3 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-default">
+              {history.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="px-6 py-8 text-center text-text-muted">
+                    No campaigns launched yet.
+                  </td>
+                </tr>
+              ) : (
+                history.map((camp, idx) => (
+                  <tr key={idx} className="hover:bg-bg/50">
+                    <td className="px-6 py-4 text-text-primary font-medium">{camp.templateName || 'Unknown'}</td>
+                    <td className="px-6 py-4 text-text-secondary">
+                      {camp.scheduledAt ? format(new Date(camp.scheduledAt), 'dd MMM yyyy, HH:mm') : format(new Date(camp.createdAt || Date.now()), 'dd MMM yyyy, HH:mm')}
+                    </td>
+                    <td className="px-6 py-4 text-text-secondary">{camp.recipientsCount || 0}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-full ${
+                        camp.status === 'COMPLETED' ? 'bg-success/20 text-success' :
+                        camp.status === 'FAILED' ? 'bg-danger/20 text-danger' :
+                        'bg-warning/20 text-warning'
+                      }`}>
+                        {camp.status || 'PENDING'}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
