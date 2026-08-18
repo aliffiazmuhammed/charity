@@ -127,7 +127,7 @@ router.get('/:campaignId/status', async (req, res) => {
       getMessageStats(campaignId),
       MessageLog.find({ campaignId })
         .sort({ createdAt: -1 })
-        .select('recipientPhone recipientName status waMessageId sentAt deliveredAt readAt failedAt errorMessage scheduledAt')
+        .select('recipientPhone recipientName status waMessageId sentAt deliveredAt readAt failedAt errorMessage scheduledAt templateName campaignName createdAt')
         .lean(),
     ]);
 
