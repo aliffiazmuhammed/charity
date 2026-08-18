@@ -44,9 +44,12 @@ export default function Header({ onLogout, slim = false }) {
   return (
     <div className={`w-full flex justify-between items-center px-6 max-w-7xl mx-auto ${slim ? 'py-2 bg-transparent' : 'py-4'}`}>
       {/* Brand */}
-      <h1 className={`font-bold tracking-tight text-primary ${slim ? 'text-lg' : 'text-2xl'}`}>
-        Meenangadi Charitable Trust
-      </h1>
+      <div className="flex items-center gap-3">
+        <img src="/logo.jpg" alt="Meenangadi Charitable Trust Logo" className={`${slim ? 'h-6' : 'h-10'} rounded-md object-contain`} />
+        <h1 className={`font-bold tracking-tight text-primary ${slim ? 'text-lg' : 'text-2xl'}`}>
+          Meenangadi Charitable Trust
+        </h1>
+      </div>
 
       {/* Right side */}
       <div className="flex items-center gap-4">
