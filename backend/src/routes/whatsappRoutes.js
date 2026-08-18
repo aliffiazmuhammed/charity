@@ -8,8 +8,10 @@ import {
   getApiStatus,
   getMessageHistory,
   getMessageStats,
+  sendToMeta,
 } from '../services/whatsappService.js';
 import { MessageLog } from '../models/MessageLog.js';
+import { InboxMessage } from '../models/InboxMessage.js';
 
 const router = express.Router();
 
@@ -267,6 +269,99 @@ router.get('/usage', auth, async (req, res) => {
       allTime,
       pendingInQueue: queuedCount,
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── Inbox Endpoints ─────────
+
+/**
+ * GET /api/whatsapp/inbox
+ * Get list of conversations grouped by senderPhone
+ */
+router.get('/inbox', auth, async (req, res) => {
+  try {
+    const conversations = await InboxMessage.aggregate([
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: '$senderPhone',
+          senderPhone: { $first: '$senderPhone' },
+          senderName: { $first: '$senderName' },
+          lastMessage: { $first: '$content' },
+          lastMessageAt: { $first: '$createdAt' },
+          lastMessageDirection: { $first: '$direction' },
+          unreadCount: {
+            $sum: {
+              $cond: [{ $and: [{ $eq: ['$direction', 'inbound'] }, { $eq: ['$isRead', false] }] }, 1, 0]
+            }
+          }
+        }
+      },
+      { $sort: { lastMessageAt: -1 } }
+    ]);
+    res.json(conversations);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/whatsapp/inbox/:phone
+ * Get chat history for a specific phone number
+ */
+router.get('/inbox/:phone', auth, async (req, res) => {
+  try {
+    const { phone } = req.params;
+    
+    // Mark inbound messages as read when fetched
+    await InboxMessage.updateMany(
+      { senderPhone: phone, direction: 'inbound', isRead: false },
+      { $set: { isRead: true } }
+    );
+
+    const messages = await InboxMessage.find({ senderPhone: phone })
+      .sort({ createdAt: 1 })
+      .lean();
+      
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/whatsapp/inbox/reply
+ * Send a manual reply to a specific phone number
+ */
+router.post('/inbox/reply', auth, async (req, res) => {
+  try {
+    const { phone, content, senderName } = req.body;
+    
+    if (!phone || !content) {
+      return res.status(400).json({ error: 'phone and content are required' });
+    }
+
+    // Send the message via Meta API
+    // Note: This uses standard message session (24h window). If it fails, they are outside the window.
+    const log = await sendToMeta(phone, { type: 'text', text: { body: content } }, { 
+      messageType: 'custom', 
+      recipientName: senderName || 'Unknown' 
+    });
+
+    // Also log this in the Inbox collection specifically
+    const inboxMsg = new InboxMessage({
+      waMessageId: log.waMessageId,
+      senderPhone: phone,
+      senderName: senderName || 'Unknown',
+      content: content,
+      direction: 'outbound',
+      status: log.status,
+    });
+    await inboxMsg.save();
+
+    res.json({ success: log.status !== 'failed', message: inboxMsg });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

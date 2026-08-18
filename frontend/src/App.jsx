@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, PlusCircle, Users, History, MessageSquareText, HandHeart, Megaphone, Activity, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Users, History, MessageSquareText, HandHeart, Megaphone, Activity, BarChart3, MessageCircle } from 'lucide-react';
 import { validateToken, logout } from './services/authService';
 
 import Login from './components/Login';
@@ -14,6 +14,7 @@ import CareOfTab from './components/CareOfTab';
 import CampaignsTab from './components/CampaignsTab';
 import MessageLogsTab from './components/MessageLogsTab';
 import UsageTab from './components/UsageTab';
+import InboxTab from './components/InboxTab';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -84,6 +85,7 @@ function App() {
     { id: 'careof', label: 'Care Of', icon: HandHeart },
     { id: 'templates', label: 'Message Templates', icon: MessageSquareText },
     { id: 'campaigns', label: 'Campaigns', icon: Megaphone },
+    { id: 'inbox', label: 'Inbox', icon: MessageCircle },
     { id: 'logs', label: 'Message Logs', icon: Activity },
     { id: 'usage', label: 'Usage', icon: BarChart3 },
   ];
@@ -132,6 +134,7 @@ function App() {
             {activeTab === 'careof' && <CareOfTab />}
             {activeTab === 'templates' && <MessageTemplatesTab />}
             {activeTab === 'campaigns' && <CampaignsTab />}
+            {activeTab === 'inbox' && <InboxTab />}
             {activeTab === 'logs' && <MessageLogsTab />}
             {activeTab === 'usage' && <UsageTab />}
           </motion.div>

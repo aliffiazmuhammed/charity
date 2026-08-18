@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { MessageLog } from '../models/MessageLog.js';
 import { MessageTemplate } from '../models/MessageTemplate.js';
+import { InboxMessage } from '../models/InboxMessage.js';
 
 const API_VERSION = process.env.WHATSAPP_API_VERSION || 'v21.0';
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -338,7 +339,7 @@ export const processWebhookPayload = async (payload) => {
         const value = change?.value;
         if (!value) continue;
 
-        // Process message status updates
+        // Process message status updates (outbound delivery)
         const statuses = value?.statuses || [];
         for (const status of statuses) {
           const waMessageId = status.id;
@@ -366,12 +367,91 @@ export const processWebhookPayload = async (payload) => {
           }
 
           if (Object.keys(update).length > 0) {
+            // Update Campaign Log
             await MessageLog.findOneAndUpdate(
               { waMessageId },
               { $set: update },
               { new: true }
             );
+            // Also update Inbox outbound log (if this was a manual reply)
+            await InboxMessage.findOneAndUpdate(
+              { waMessageId },
+              { $set: update },
+              { new: true }
+            );
             console.log(`[WhatsApp Webhook] Status update: ${waMessageId} → ${statusValue}`);
+          }
+        }
+
+        // Process incoming messages (inbound replies)
+        const messages = value?.messages || [];
+        const contacts = value?.contacts || [];
+        
+        for (const msg of messages) {
+          if (msg.type !== 'text' && msg.type !== 'button') continue; // Only handle text for now
+
+          const waMessageId = msg.id;
+          const senderPhone = msg.from;
+          const content = msg.text?.body || msg.button?.text || '[Unsupported message type]';
+          const timestamp = msg.timestamp ? new Date(Number(msg.timestamp) * 1000) : new Date();
+          
+          // Find sender name from contacts array
+          const contact = contacts.find(c => c.wa_id === senderPhone);
+          const senderName = contact?.profile?.name || 'Unknown';
+
+          // Save to InboxMessage
+          const inboxMsg = new InboxMessage({
+            waMessageId,
+            senderPhone,
+            senderName,
+            content,
+            direction: 'inbound',
+            status: 'received',
+            createdAt: timestamp,
+          });
+          await inboxMsg.save();
+          console.log(`[WhatsApp Webhook] Incoming message from ${senderPhone}: ${content}`);
+
+          // Handle Auto-Reply
+          if (process.env.AUTO_REPLY_ENABLED === 'true') {
+            try {
+              const replyText = process.env.AUTO_REPLY_TEXT || 'Thank you for your message! This is an automated number. Please contact us directly for assistance.';
+              
+              // We use axios directly to avoid circular dependencies if sendToMeta is restructured
+              const formattedPhone = senderPhone; 
+              
+              const response = await axios.post(
+                `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}/messages`,
+                {
+                  messaging_product: 'whatsapp',
+                  to: formattedPhone,
+                  type: 'text',
+                  text: { body: replyText }
+                },
+                { 
+                  headers: {
+                    Authorization: `Bearer ${ACCESS_TOKEN}`,
+                    'Content-Type': 'application/json',
+                  }
+                }
+              );
+              
+              const replyWaMessageId = response.data?.messages?.[0]?.id;
+              
+              // Log the outbound auto-reply in Inbox
+              await InboxMessage.create({
+                waMessageId: replyWaMessageId,
+                senderPhone: formattedPhone,
+                senderName: senderName, // keep same name
+                content: replyText,
+                direction: 'outbound',
+                status: 'sent', // Will get updated by webhook later
+              });
+              
+              console.log(`[WhatsApp Webhook] Auto-reply sent to ${formattedPhone}`);
+            } catch (replyErr) {
+              console.error('[WhatsApp Webhook] Auto-reply failed:', replyErr.message);
+            }
           }
         }
       }
