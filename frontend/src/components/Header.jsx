@@ -44,7 +44,7 @@ export default function Header({ onLogout, slim = false }) {
   return (
     <div className={`w-full flex justify-between items-center px-6 max-w-7xl mx-auto ${slim ? 'py-2 bg-transparent' : 'py-4'}`}>
       {/* Brand */}
-      <h1 className={`font-bold tracking-tight text-primary-light ${slim ? 'text-lg' : 'text-2xl'}`}>
+      <h1 className={`font-bold tracking-tight text-primary ${slim ? 'text-lg' : 'text-2xl'}`}>
         Meenangadi Charitable Trust
       </h1>
 
