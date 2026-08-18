@@ -18,7 +18,14 @@ import UsageTab from './components/UsageTab';
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'add', 'directory'
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('activeTab') || 'dashboard';
+  });
+
+  // Persist active tab to localStorage
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
 
   // Listen for global logout events (from API interceptors)
   useEffect(() => {
