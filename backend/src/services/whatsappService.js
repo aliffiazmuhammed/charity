@@ -35,7 +35,7 @@ const formatPhone = (phone) => {
  * Core function to send any message via Meta Cloud API.
  * Creates a MessageLog entry and returns it.
  */
-const sendToMeta = async (to, messagePayload, logData = {}) => {
+export const sendToMeta = async (to, messagePayload, logData = {}) => {
   const formattedPhone = formatPhone(to);
 
   // Create log entry first
