@@ -6,8 +6,9 @@ import api from '../config/api';
 import { Upload, Users, Calendar, Send, BarChart2, RefreshCw, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
+import CampaignDetailsModal from './CampaignDetailsModal';
 
-export default function CampaignsTab({ onViewLogs }) {
+export default function CampaignsTab() {
   const [history, setHistory] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [donors, setDonors] = useState([]);
@@ -34,6 +35,8 @@ export default function CampaignsTab({ onViewLogs }) {
 
   const [dailyLimit, setDailyLimit] = useState(null);
   const [dailyLimitRemaining, setDailyLimitRemaining] = useState(null);
+  
+  const [selectedCampaignId, setSelectedCampaignId] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -448,12 +451,12 @@ export default function CampaignsTab({ onViewLogs }) {
                       })()}
                     </td>
                     <td className="px-6 py-4">
-                      <button 
-                        onClick={() => onViewLogs && onViewLogs(camp.campaignId)}
-                        className="text-primary text-sm hover:underline font-medium"
-                      >
-                        View Logs
-                      </button>
+                        <button
+                          onClick={() => setSelectedCampaignId(camp.campaignId)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-sm font-medium transition-colors"
+                        >
+                          <BarChart2 size={14} /> Dashboard
+                        </button>
                     </td>
                   </tr>
                 ))
@@ -519,6 +522,13 @@ export default function CampaignsTab({ onViewLogs }) {
             </div>
           </div>
         </div>
+      )}
+
+      {selectedCampaignId && (
+        <CampaignDetailsModal 
+          campaignId={selectedCampaignId} 
+          onClose={() => setSelectedCampaignId(null)} 
+        />
       )}
     </div>
   );

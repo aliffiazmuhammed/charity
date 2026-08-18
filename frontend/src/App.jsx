@@ -19,7 +19,6 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'add', 'directory'
-  const [logFilterCampaignId, setLogFilterCampaignId] = useState(null);
 
   // Listen for global logout events (from API interceptors)
   useEffect(() => {
@@ -94,10 +93,7 @@ function App() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  if (tab.id !== 'logs') setLogFilterCampaignId(null);
-                }}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-5 py-3 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-bg text-primary border-t border-x border-border-default -mb-[1px] relative z-10'
@@ -128,8 +124,8 @@ function App() {
             {activeTab === 'directory' && <DonorDirectoryTab />}
             {activeTab === 'careof' && <CareOfTab />}
             {activeTab === 'templates' && <MessageTemplatesTab />}
-            {activeTab === 'campaigns' && <CampaignsTab onViewLogs={(cid) => { setLogFilterCampaignId(cid); setActiveTab('logs'); }} />}
-            {activeTab === 'logs' && <MessageLogsTab initialCampaignId={logFilterCampaignId} />}
+            {activeTab === 'campaigns' && <CampaignsTab />}
+            {activeTab === 'logs' && <MessageLogsTab />}
             {activeTab === 'usage' && <UsageTab />}
           </motion.div>
         </AnimatePresence>

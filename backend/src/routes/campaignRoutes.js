@@ -141,4 +141,35 @@ router.get('/:campaignId/status', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/campaigns/:campaignId/retry
+ * Retry failed messages in a campaign.
+ */
+router.post('/:campaignId/retry', async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+
+    const result = await MessageLog.updateMany(
+      { campaignId, status: 'failed' },
+      { 
+        $set: { 
+          status: 'queued', 
+          errorMessage: null, 
+          errorCode: null,
+          failedAt: null
+        },
+        $inc: { retryCount: 1 }
+      }
+    );
+
+    res.json({
+      success: true,
+      requeuedCount: result.modifiedCount,
+      message: `${result.modifiedCount} failed messages requeued for sending.`
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
