@@ -7,6 +7,7 @@ import {
   getDashboardStats,
   getAllDonationsForExport,
   getCareOfStats,
+  updateDonation,
 } from '../services/donationService.js';
 import { generateCSV } from '../utils/csvExport.js';
 import { sendThankYouMessage } from '../services/whatsappService.js';
@@ -63,12 +64,12 @@ router.get('/care-of-stats', async (req, res) => {
 
 /**
  * GET /api/donations
- * All donations (newest first). Supports ?search= query param.
+ * All donations (newest first). Supports ?search= and ?careOf= query params.
  */
 router.get('/', async (req, res) => {
   try {
-    const { search, page, limit, sortBy, sortOrder } = req.query;
-    const result = await getAllDonations({ search, page, limit, sortBy, sortOrder });
+    const { search, careOf, page, limit, sortBy, sortOrder } = req.query;
+    const result = await getAllDonations({ search, careOf, page, limit, sortBy, sortOrder });
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -119,6 +120,27 @@ router.delete('/:id', async (req, res) => {
     res.json({ message: 'Donation deleted successfully', donation: deleted });
   } catch (error) {
     res.status(404).json({ error: error.message });
+  }
+});
+
+/**
+ * PUT /api/donations/:id
+ * Update a donation by its ID.
+ */
+router.put('/:id', validateDonation, async (req, res) => {
+  try {
+    const { donorName, phone, amount, date, note, careOf } = req.body;
+    const updatedDonation = await updateDonation(req.params.id, {
+      donorName,
+      phone,
+      amount,
+      date: date || new Date(),
+      note: note || '',
+      careOf: careOf || '',
+    });
+    res.json(updatedDonation);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 

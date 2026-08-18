@@ -25,6 +25,11 @@ export const deleteDonation = async (id) => {
   return response.data;
 };
 
+export const updateDonation = async (id, updateData) => {
+  const response = await api.put(`/donations/${id}`, updateData);
+  return response.data;
+};
+
 // Donor Specific Services
 export const getAllDonors = async (params = {}) => {
   const response = await api.get('/donors', { params });

@@ -12,7 +12,7 @@ export const createDonation = async (donationData) => {
  * Get all donations, newest first.
  * Supports optional search by donor name or phone number.
  */
-export const getAllDonations = async ({ search, page = 1, limit = 10, sortBy = 'date', sortOrder = 'desc' }) => {
+export const getAllDonations = async ({ search, careOf, page = 1, limit = 10, sortBy = 'date', sortOrder = 'desc' }) => {
   let filter = {};
 
   if (search && search.trim().length > 0) {
@@ -24,6 +24,10 @@ export const getAllDonations = async ({ search, page = 1, limit = 10, sortBy = '
         { careOf: { $regex: regex } },
       ],
     };
+  }
+
+  if (careOf && careOf.trim().length > 0) {
+    filter.careOf = careOf.trim();
   }
 
   // Construct sort object
@@ -61,6 +65,17 @@ export const deleteDonation = async (id) => {
     throw new Error('Donation not found');
   }
   return deleted;
+};
+
+/**
+ * Update an existing donation.
+ */
+export const updateDonation = async (id, updateData) => {
+  const updated = await Donation.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
+  if (!updated) {
+    throw new Error('Donation not found');
+  }
+  return updated;
 };
 
 /**

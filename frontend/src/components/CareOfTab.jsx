@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { HandHeart, AlertCircle } from 'lucide-react';
+import { HandHeart, AlertCircle, Eye } from 'lucide-react';
 import { getCareOfStats } from '../services/donationService';
+import CareOfDetailsModal from './CareOfDetailsModal';
 
 export default function CareOfTab() {
   const [stats, setStats] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [selectedCareOf, setSelectedCareOf] = useState(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+
+  const handleViewDetails = (careOfName) => {
+    setSelectedCareOf(careOfName);
+    setIsDetailsModalOpen(true);
+  };
 
   useEffect(() => {
     loadData();
@@ -69,9 +78,15 @@ export default function CareOfTab() {
               </tr>
             ) : (
               stats.map((c, index) => (
-                <tr key={c.careOf} className="border-b border-border-default hover:bg-warm-white transition-colors">
+                <tr 
+                  key={c.careOf} 
+                  className="border-b border-border-default hover:bg-warm-white transition-colors cursor-pointer"
+                  onClick={() => handleViewDetails(c.careOf)}
+                >
                   <td className="p-4 text-sm text-text-muted font-medium">#{index + 1}</td>
-                  <td className="p-4 text-sm font-semibold text-text-primary">{c.careOf}</td>
+                  <td className="p-4 text-sm font-semibold text-text-primary flex items-center gap-2">
+                    {c.careOf} <Eye size={14} className="text-text-muted" />
+                  </td>
                   <td className="p-4 text-sm font-bold text-success">{formatCurrency(c.totalAmount)}</td>
                   <td className="p-4 text-sm text-text-secondary">
                     <span className="bg-bg px-2 py-1 rounded text-xs border border-border-default">{c.donationCount}</span>
@@ -84,6 +99,12 @@ export default function CareOfTab() {
           </tbody>
         </table>
       </div>
+
+      <CareOfDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        careOfName={selectedCareOf}
+      />
     </motion.div>
   );
 }

@@ -8,9 +8,11 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
-  ArrowUpDown
+  ArrowUpDown,
+  Edit
 } from 'lucide-react';
 import { getDonations, deleteDonation, exportDonationsCSV } from '../services/donationService';
+import DonationEditModal from './DonationEditModal';
 
 export default function DonationHistoryTab() {
   const [donations, setDonations] = useState([]);
@@ -26,6 +28,15 @@ export default function DonationHistoryTab() {
   // Response Metadata
   const [totalPages, setTotalPages] = useState(1);
   const [totalDonations, setTotalDonations] = useState(0);
+
+  // Edit Modal State
+  const [editingDonation, setEditingDonation] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const handleEdit = (donation) => {
+    setEditingDonation(donation);
+    setIsEditModalOpen(true);
+  };
 
   const loadData = async () => {
     setIsLoading(true);
@@ -190,7 +201,14 @@ export default function DonationHistoryTab() {
                     <td className="p-4 text-sm text-text-muted max-w-xs truncate" title={d.note}>
                       {d.note || '-'}
                     </td>
-                    <td className="p-4 text-right">
+                    <td className="p-4 text-right flex justify-end gap-2">
+                      <button
+                        onClick={() => handleEdit(d)}
+                        className="text-text-muted hover:text-primary hover:bg-primary/10 p-1.5 rounded transition-colors"
+                        title="Edit record"
+                      >
+                        <Edit size={16} />
+                      </button>
                       <button
                         onClick={() => handleDelete(d._id)}
                         className="text-text-muted hover:text-danger hover:bg-danger-bg p-1.5 rounded transition-colors"
@@ -235,6 +253,13 @@ export default function DonationHistoryTab() {
           </div>
         </div>
       </motion.div>
+
+      <DonationEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        donation={editingDonation}
+        onSave={loadData}
+      />
     </div>
   );
 }
