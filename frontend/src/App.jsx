@@ -5,6 +5,7 @@ import { validateToken, logout } from './services/authService';
 
 import Login from './components/Login';
 import Header from './components/Header';
+import Sidebar from './components/Sidebar';
 import DashboardTab from './components/DashboardTab';
 import AddDonationTab from './components/AddDonationTab';
 import DonorDirectoryTab from './components/DonorDirectoryTab';
@@ -91,62 +92,49 @@ function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-bg text-text-primary flex flex-col items-center font-sans">
-      {/* Sticky Header with WA Status */}
-      <header className="w-full bg-primary-dark text-surface shadow-md sticky top-0 z-10">
-        <Header onLogout={handleLogout} />
-        
-        {/* Navigation Tabs */}
-        <div className="max-w-6xl mx-auto px-6 pt-2">
-          <nav className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-5 py-3 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'bg-bg text-primary border-t border-x border-border-default -mb-[1px] relative z-10'
-                    : 'text-primary-light hover:bg-primary hover:text-white border-transparent'
-                }`}
-              >
-                <tab.icon size={18} />
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </header>
+    <div className="flex h-screen bg-bg text-text-primary font-sans overflow-hidden">
+      
+      {/* Sidebar Component */}
+      <Sidebar 
+        tabs={tabs} 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        onLogout={handleLogout} 
+      />
 
       {/* Main Content Area */}
-      <main className="w-full max-w-6xl mx-auto p-6 mt-4 flex-1">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
-            {activeTab === 'dashboard' && <DashboardTab />}
-            {activeTab === 'history' && <DonationHistoryTab />}
-            {activeTab === 'add' && <AddDonationTab />}
-            {activeTab === 'directory' && <DonorDirectoryTab />}
-            {activeTab === 'careof' && <CareOfTab />}
-            {activeTab === 'templates' && <MessageTemplatesTab />}
-            {activeTab === 'campaigns' && <CampaignsTab />}
-            {activeTab === 'inbox' && <InboxTab />}
-            {activeTab === 'logs' && <MessageLogsTab />}
-            {activeTab === 'usage' && <UsageTab />}
-          </motion.div>
-        </AnimatePresence>
-      </main>
+      <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
+        
+        {/* Slim Header */}
+        <header className="w-full bg-surface/80 backdrop-blur-md border-b border-border-default sticky top-0 z-10">
+          <Header onLogout={handleLogout} slim={true} />
+        </header>
 
-      {/* Footer */}
-      <footer className="w-full border-t border-border-default mt-auto py-6 bg-surface text-center">
-        <p className="text-xs text-text-muted">
-          Meenangadi Charitable Trust © {new Date().getFullYear()} • Secure Internal Dashboard
-        </p>
-      </footer>
+        {/* Tab Content */}
+        <main className="flex-1 overflow-y-auto p-6">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="max-w-7xl mx-auto"
+            >
+              {activeTab === 'dashboard' && <DashboardTab />}
+              {activeTab === 'history' && <DonationHistoryTab />}
+              {activeTab === 'add' && <AddDonationTab />}
+              {activeTab === 'directory' && <DonorDirectoryTab />}
+              {activeTab === 'careof' && <CareOfTab />}
+              {activeTab === 'templates' && <MessageTemplatesTab />}
+              {activeTab === 'campaigns' && <CampaignsTab />}
+              {activeTab === 'inbox' && <InboxTab />}
+              {activeTab === 'logs' && <MessageLogsTab />}
+              {activeTab === 'usage' && <UsageTab />}
+            </motion.div>
+          </AnimatePresence>
+        </main>
+      </div>
     </div>
   );
 }
