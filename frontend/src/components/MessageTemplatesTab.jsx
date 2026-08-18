@@ -20,6 +20,90 @@ const DEFAULT_TEMPLATE = {
   headerType: 'none', headerContent: '', footerText: '', buttons: []
 };
 
+// --- Guide Modal Component ---
+const TemplateGuideModal = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          className="bg-surface rounded-xl shadow-card border border-border-default w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        >
+          <div className="flex justify-between items-center p-4 border-b border-border-default bg-warm-white shrink-0">
+            <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+              <Info size={20} className="text-primary" /> WhatsApp Template Guide
+            </h2>
+            <button onClick={onClose} className="text-text-muted hover:text-danger transition-colors">
+              <X size={20} />
+            </button>
+          </div>
+          <div className="overflow-y-auto p-6 space-y-6 text-sm text-text-primary">
+            
+            <section>
+              <h3 className="text-base font-semibold text-primary mb-3">Message Categories</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="p-4 bg-info-bg border border-info/20 rounded-lg">
+                  <h4 className="font-semibold text-info mb-1">Utility</h4>
+                  <p className="text-text-secondary leading-relaxed">Messages related to a specific, agreed-upon transaction. These are typically triggered by a user action.</p>
+                  <p className="mt-2 text-xs text-text-muted italic">Examples: Post-donation thank you messages, receipts, event reminders, or account updates.</p>
+                </div>
+                <div className="p-4 bg-warning-bg border border-warning/20 rounded-lg">
+                  <h4 className="font-semibold text-warning mb-1">Marketing</h4>
+                  <p className="text-text-secondary leading-relaxed">Messages that include promotions, offers, informational updates, or invitations. Anything not purely transactional.</p>
+                  <p className="mt-2 text-xs text-text-muted italic">Examples: General charity newsletters, new campaign announcements, or appeals for donations.</p>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h3 className="text-base font-semibold text-primary mb-3">Template Sections</h3>
+              <div className="space-y-4">
+                <div className="border border-border-default rounded-lg p-4">
+                  <h4 className="font-semibold mb-1 flex items-center gap-2"><Type size={16} className="text-text-muted"/> Header <span className="text-[10px] font-normal px-2 py-0.5 bg-bg rounded-full text-text-muted">Optional</span></h4>
+                  <p className="text-text-secondary mb-2">Appears at the very top of the message.</p>
+                  <ul className="list-disc list-inside text-text-secondary space-y-1 ml-1">
+                    <li><span className="font-medium">Text:</span> A short bold title (max 60 chars).</li>
+                    <li><span className="font-medium">Media (Image, Video, Document):</span> Attach a file to make your message stand out. You must provide a publicly accessible URL.</li>
+                  </ul>
+                </div>
+
+                <div className="border border-border-default rounded-lg p-4 border-l-4 border-l-primary">
+                  <h4 className="font-semibold mb-1 flex items-center gap-2"><MessageSquareText size={16} className="text-text-muted"/> Body <span className="text-[10px] font-normal px-2 py-0.5 bg-primary-light text-primary rounded-full">Required</span></h4>
+                  <p className="text-text-secondary">The main content of your message (max 1024 chars). You can use placeholders like <code className="bg-bg px-1 rounded text-xs">{'{{donorName}}'}</code>, <code className="bg-bg px-1 rounded text-xs">{'{{amount}}'}</code>, and <code className="bg-bg px-1 rounded text-xs">{'{{date}}'}</code> to automatically personalize the message for each recipient.</p>
+                </div>
+
+                <div className="border border-border-default rounded-lg p-4">
+                  <h4 className="font-semibold mb-1 flex items-center gap-2"><FileText size={16} className="text-text-muted"/> Footer <span className="text-[10px] font-normal px-2 py-0.5 bg-bg rounded-full text-text-muted">Optional</span></h4>
+                  <p className="text-text-secondary">A short line of muted text at the bottom of the message (max 60 chars). Useful for signatures or disclaimers, like "Powered by Our Charity". No variables allowed.</p>
+                </div>
+
+                <div className="border border-border-default rounded-lg p-4">
+                  <h4 className="font-semibold mb-1 flex items-center gap-2"><PlusCircle size={16} className="text-text-muted"/> Buttons <span className="text-[10px] font-normal px-2 py-0.5 bg-bg rounded-full text-text-muted">Optional</span></h4>
+                  <p className="text-text-secondary mb-2">Interactive buttons appended to your message (max 3 buttons allowed).</p>
+                  <ul className="list-disc list-inside text-text-secondary space-y-1 ml-1">
+                    <li><span className="font-medium">Quick Reply:</span> Let users tap to quickly send a pre-defined text reply.</li>
+                    <li><span className="font-medium">URL:</span> Direct users to a specific webpage.</li>
+                    <li><span className="font-medium">Phone Number:</span> Let users tap to call a specific number.</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+          </div>
+          <div className="p-4 border-t border-border-default bg-warm-white text-right shrink-0">
+            <button onClick={onClose} className="px-4 py-2 bg-primary hover:bg-primary-mid text-white text-sm font-medium rounded-md transition-colors">
+              Got it
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
+  );
+};
+
 export default function MessageTemplatesTab() {
   const [templates, setTemplates] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,6 +117,7 @@ export default function MessageTemplatesTab() {
 
   // Collapsible section state
   const [openSections, setOpenSections] = useState({ header: false, footer: false, buttons: false });
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   
   const textareaRef = useRef(null);
 
@@ -366,9 +451,14 @@ export default function MessageTemplatesTab() {
               <h2 className="font-semibold text-text-primary flex items-center gap-2">
                 {currentTemplate._id ? 'Edit Template' : 'New Template'}
               </h2>
-              <button onClick={handleCancelEdit} className="text-text-muted hover:text-text-primary transition-colors">
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => setIsGuideOpen(true)} className="flex items-center gap-1 text-xs font-medium text-info hover:text-info/80 transition-colors">
+                  <Info size={14} /> Guide
+                </button>
+                <button onClick={handleCancelEdit} className="text-text-muted hover:text-text-primary transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 flex flex-col no-scrollbar">
@@ -893,6 +983,9 @@ export default function MessageTemplatesTab() {
           </div>
         )}
       </div>
+      
+      {/* Guide Modal Overlay */}
+      <TemplateGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
     </div>
   );
 }
