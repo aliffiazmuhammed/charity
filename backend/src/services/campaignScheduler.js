@@ -20,9 +20,9 @@ const formatPhone = (phone) => {
 };
 
 // Configuration
-const BATCH_SIZE = 5;           // Messages per batch
-const DELAY_BETWEEN_MSGS = 3000; // 3s between individual messages
-const POLL_INTERVAL = 15000;     // Check for queued messages every 15s
+const BATCH_SIZE = 10;           // Messages per batch
+const DELAY_BETWEEN_MSGS = 2000; // 2s between individual messages
+const POLL_INTERVAL = 10000;     // Check for queued messages every 10s
 const MAX_RETRIES = 2;           // Retry failed messages up to 2 times
 const RATE_LIMIT_PAUSE = 60000;  // Pause 60s if rate limited
 
@@ -55,6 +55,19 @@ const processMessage = async (log) => {
   };
 
   try {
+    // DRY_RUN mode: simulate successful send without calling Meta API
+    const isDryRun = process.env.CAMPAIGN_DRY_RUN === 'true';
+
+    if (isDryRun) {
+      const fakeWamid = `dryrun_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      log.waMessageId = fakeWamid;
+      log.status = 'sent';
+      log.sentAt = new Date();
+      await log.save();
+      console.log(`[Worker] 🧪 DRY RUN: Simulated send to ${formattedPhone} (fake wamid: ${fakeWamid})`);
+      return { success: true };
+    }
+
     const response = await axios.post(`${BASE_URL}/messages`, messagePayload, { headers: getHeaders() });
 
     log.waMessageId = response.data?.messages?.[0]?.id;
@@ -96,30 +109,61 @@ const processMessage = async (log) => {
 };
 
 /**
+ * Count how many messages were successfully sent today.
+ */
+const getTodaySentCount = async () => {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const count = await MessageLog.countDocuments({
+    status: { $in: ['sent', 'delivered', 'read'] },
+    sentAt: { $gte: todayStart },
+  });
+  return count;
+};
+
+/**
  * Process a batch of queued/scheduled messages.
+ * Respects the daily sending limit — pauses automatically when reached.
  */
 const processBatch = async () => {
   if (isProcessing) return;
   isProcessing = true;
 
   try {
+    const dailyLimit = parseInt(process.env.WHATSAPP_DAILY_LIMIT) || 250;
+
+    // Check daily limit before doing anything
+    const sentToday = await getTodaySentCount();
+    const remaining = dailyLimit - sentToday;
+
+    if (remaining <= 0) {
+      const queuedCount = await MessageLog.countDocuments({ status: 'queued' });
+      if (queuedCount > 0) {
+        console.log(`[Worker] ⏸️ Daily limit reached (${sentToday}/${dailyLimit}). ${queuedCount} messages waiting for tomorrow.`);
+      }
+      isProcessing = false;
+      return;
+    }
+
     // First: move scheduled messages that are due to 'queued'
     await MessageLog.updateMany(
       { status: 'scheduled', scheduledAt: { $lte: new Date() } },
       { $set: { status: 'queued' } }
     );
 
-    // Fetch next batch of queued messages
+    // Fetch next batch — capped by daily remaining
+    const batchLimit = Math.min(BATCH_SIZE, remaining);
     const messages = await MessageLog.find({ status: 'queued' })
       .sort({ createdAt: 1 })
-      .limit(BATCH_SIZE);
+      .limit(batchLimit);
 
     if (messages.length === 0) {
       isProcessing = false;
       return;
     }
 
-    console.log(`[Worker] 📦 Processing batch of ${messages.length} messages...`);
+    console.log(`[Worker] 📦 Processing batch of ${messages.length} messages (sent today: ${sentToday}/${dailyLimit})...`);
 
     for (const msg of messages) {
       const result = await processMessage(msg);
