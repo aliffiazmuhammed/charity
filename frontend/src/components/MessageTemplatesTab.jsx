@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { MessageSquareText, Plus, Check, Edit2, Trash2, X, PlayCircle, Info, RefreshCw, Send } from 'lucide-react';
+import {
+  MessageSquareText, Plus, Check, Edit2, Trash2, X, PlayCircle, Info, RefreshCw, Send,
+  ChevronDown, ChevronRight, Image, FileText, Video, Link, Phone, Type, PlusCircle, Minus
+} from 'lucide-react';
 import {
   getTemplates,
   createTemplate,
@@ -12,6 +15,11 @@ import {
   submitToMeta
 } from '../services/templateService';
 
+const DEFAULT_TEMPLATE = {
+  name: '', body: '', isActive: false, metaTemplateName: '', language: 'en', metaCategory: 'UTILITY',
+  headerType: 'none', headerContent: '', footerText: '', buttons: []
+};
+
 export default function MessageTemplatesTab() {
   const [templates, setTemplates] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -19,9 +27,12 @@ export default function MessageTemplatesTab() {
   
   // Editor State
   const [isEditing, setIsEditing] = useState(false);
-  const [currentTemplate, setCurrentTemplate] = useState({ name: '', body: '', isActive: false, metaTemplateName: '', language: 'en', metaCategory: 'UTILITY' });
+  const [currentTemplate, setCurrentTemplate] = useState({ ...DEFAULT_TEMPLATE });
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Collapsible section state
+  const [openSections, setOpenSections] = useState({ header: false, footer: false, buttons: false });
   
   const textareaRef = useRef(null);
 
@@ -43,20 +54,28 @@ export default function MessageTemplatesTab() {
   };
 
   const handleCreateNew = () => {
-    setCurrentTemplate({ name: '', body: '', isActive: false, metaTemplateName: '', language: 'en', metaCategory: 'UTILITY' });
+    setCurrentTemplate({ ...DEFAULT_TEMPLATE });
     setIsEditing(true);
     setErrorMsg('');
+    setOpenSections({ header: false, footer: false, buttons: false });
   };
 
   const handleEdit = (template) => {
-    setCurrentTemplate({ metaTemplateName: '', language: 'en', metaCategory: 'UTILITY', ...template });
+    const merged = { ...DEFAULT_TEMPLATE, ...template };
+    setCurrentTemplate(merged);
     setIsEditing(true);
     setErrorMsg('');
+    // Auto-open sections that have content
+    setOpenSections({
+      header: merged.headerType !== 'none',
+      footer: !!merged.footerText,
+      buttons: merged.buttons && merged.buttons.length > 0
+    });
   };
 
   const handleCancelEdit = () => {
     setIsEditing(false);
-    setCurrentTemplate({ name: '', body: '', isActive: false, metaTemplateName: '', language: 'en', metaCategory: 'UTILITY' });
+    setCurrentTemplate({ ...DEFAULT_TEMPLATE });
     setErrorMsg('');
   };
 
@@ -76,7 +95,11 @@ export default function MessageTemplatesTab() {
         isActive: currentTemplate.isActive,
         metaTemplateName: currentTemplate.metaTemplateName,
         language: currentTemplate.language,
-        metaCategory: currentTemplate.metaCategory
+        metaCategory: currentTemplate.metaCategory,
+        headerType: currentTemplate.headerType || 'none',
+        headerContent: currentTemplate.headerContent || '',
+        footerText: currentTemplate.footerText || '',
+        buttons: currentTemplate.buttons || []
       };
 
       if (currentTemplate._id) {
@@ -162,14 +185,39 @@ export default function MessageTemplatesTab() {
       body: newText
     });
 
-    // Set cursor position after placeholder
     setTimeout(() => {
       textarea.selectionStart = textarea.selectionEnd = start + placeholder.length;
       textarea.focus();
     }, 0);
   };
 
-  // Preview data
+  const toggleSection = (section) => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // --- Button helpers ---
+  const addButton = () => {
+    if ((currentTemplate.buttons || []).length >= 3) return;
+    setCurrentTemplate({
+      ...currentTemplate,
+      buttons: [...(currentTemplate.buttons || []), { type: 'QUICK_REPLY', text: '', url: '', phoneNumber: '' }]
+    });
+    if (!openSections.buttons) setOpenSections(prev => ({ ...prev, buttons: true }));
+  };
+
+  const updateButton = (index, field, value) => {
+    const updated = [...(currentTemplate.buttons || [])];
+    updated[index] = { ...updated[index], [field]: value };
+    setCurrentTemplate({ ...currentTemplate, buttons: updated });
+  };
+
+  const removeButton = (index) => {
+    const updated = [...(currentTemplate.buttons || [])];
+    updated.splice(index, 1);
+    setCurrentTemplate({ ...currentTemplate, buttons: updated });
+  };
+
+  // --- Preview ---
   const previewDonorName = "Rahul Sharma";
   const previewAmount = "₹5,000";
   const previewDate = format(new Date(), 'dd MMM yyyy');
@@ -181,6 +229,31 @@ export default function MessageTemplatesTab() {
       .replace(/\{\{amount\}\}/g, previewAmount)
       .replace(/\{\{date\}\}/g, previewDate);
   };
+
+  const headerMediaIcons = {
+    image: <Image size={32} className="text-text-muted" />,
+    video: <Video size={32} className="text-text-muted" />,
+    document: <FileText size={32} className="text-text-muted" />,
+  };
+
+  // --- Section Header Component ---
+  const SectionHeader = ({ label, section, icon: Icon, badge }) => (
+    <button
+      type="button"
+      onClick={() => toggleSection(section)}
+      className="w-full flex items-center justify-between px-4 py-2.5 bg-bg rounded-lg border border-border-default hover:border-border-strong transition-colors text-left"
+    >
+      <div className="flex items-center gap-2">
+        <Icon size={16} className="text-text-muted" />
+        <span className="text-sm font-medium text-text-primary">{label}</span>
+        {badge && <span className="text-[10px] bg-primary-light text-primary px-1.5 py-0.5 rounded-full font-semibold">{badge}</span>}
+      </div>
+      {openSections[section]
+        ? <ChevronDown size={16} className="text-text-muted" />
+        : <ChevronRight size={16} className="text-text-muted" />
+      }
+    </button>
+  );
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto h-[calc(100vh-180px)]">
@@ -219,7 +292,7 @@ export default function MessageTemplatesTab() {
             templates.map(template => (
               <motion.div
                 key={template._id}
-                onClick={() => !isEditing && setCurrentTemplate(template)}
+                onClick={() => !isEditing && setCurrentTemplate({ ...DEFAULT_TEMPLATE, ...template })}
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={`p-4 rounded-lg border transition-all cursor-pointer ${
@@ -313,6 +386,7 @@ export default function MessageTemplatesTab() {
               </AnimatePresence>
 
               <form onSubmit={handleSave} className="flex flex-col gap-5 flex-1">
+                {/* --- Basic Info --- */}
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-1">Display Name *</label>
                   <input
@@ -361,6 +435,80 @@ export default function MessageTemplatesTab() {
                   </div>
                 </div>
 
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/* HEADER SECTION */}
+                {/* ═══════════════════════════════════════════════════════ */}
+                <div>
+                  <SectionHeader
+                    label="Header"
+                    section="header"
+                    icon={Type}
+                    badge={currentTemplate.headerType !== 'none' ? currentTemplate.headerType.toUpperCase() : null}
+                  />
+                  {openSections.header && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-2 p-4 border border-border-default rounded-lg bg-warm-white space-y-3"
+                    >
+                      <div>
+                        <label className="block text-xs font-medium text-text-secondary mb-1">Header Type</label>
+                        <select
+                          value={currentTemplate.headerType || 'none'}
+                          onChange={e => setCurrentTemplate({ ...currentTemplate, headerType: e.target.value, headerContent: '' })}
+                          className="w-full px-3 py-2 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-surface"
+                        >
+                          <option value="none">None</option>
+                          <option value="text">Text</option>
+                          <option value="image">Image</option>
+                          <option value="video">Video</option>
+                          <option value="document">Document (PDF)</option>
+                        </select>
+                      </div>
+
+                      {currentTemplate.headerType === 'text' && (
+                        <div>
+                          <label className="block text-xs font-medium text-text-secondary mb-1">Header Text <span className="text-text-muted">(max 60 chars)</span></label>
+                          <input
+                            type="text"
+                            maxLength={60}
+                            value={currentTemplate.headerContent || ''}
+                            onChange={e => setCurrentTemplate({ ...currentTemplate, headerContent: e.target.value })}
+                            placeholder="e.g. Thank you for your donation!"
+                            className="w-full px-3 py-2 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-surface"
+                          />
+                          <p className="text-xs text-text-muted mt-1 text-right">{(currentTemplate.headerContent || '').length}/60</p>
+                        </div>
+                      )}
+
+                      {['image', 'video', 'document'].includes(currentTemplate.headerType) && (
+                        <div>
+                          <label className="block text-xs font-medium text-text-secondary mb-1">
+                            {currentTemplate.headerType === 'image' && 'Image URL'}
+                            {currentTemplate.headerType === 'video' && 'Video URL'}
+                            {currentTemplate.headerType === 'document' && 'Document URL (PDF)'}
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <Link size={14} className="text-text-muted shrink-0" />
+                            <input
+                              type="url"
+                              value={currentTemplate.headerContent || ''}
+                              onChange={e => setCurrentTemplate({ ...currentTemplate, headerContent: e.target.value })}
+                              placeholder="https://example.com/file.jpg"
+                              className="w-full px-3 py-2 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-surface"
+                            />
+                          </div>
+                          <p className="text-xs text-text-muted mt-1">Paste a publicly hosted URL for this media.</p>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/* BODY SECTION (always visible) */}
+                {/* ═══════════════════════════════════════════════════════ */}
                 <div className="flex flex-col flex-1">
                   <div className="flex justify-between items-end mb-1">
                     <label className="block text-sm font-medium text-text-secondary">Message Body *</label>
@@ -382,10 +530,148 @@ export default function MessageTemplatesTab() {
                     value={currentTemplate.body}
                     onChange={e => setCurrentTemplate({...currentTemplate, body: e.target.value})}
                     placeholder="Type your message here. Click placeholders to insert them..."
-                    className="w-full flex-1 min-h-[150px] p-4 border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg resize-none text-text-primary font-sans leading-relaxed whitespace-pre-wrap"
+                    maxLength={1024}
+                    className="w-full flex-1 min-h-[120px] p-4 border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg resize-none text-text-primary font-sans leading-relaxed whitespace-pre-wrap"
                   />
+                  <p className="text-xs text-text-muted mt-1 text-right">{(currentTemplate.body || '').length}/1024</p>
+                </div>
+
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/* FOOTER SECTION */}
+                {/* ═══════════════════════════════════════════════════════ */}
+                <div>
+                  <SectionHeader
+                    label="Footer"
+                    section="footer"
+                    icon={FileText}
+                    badge={currentTemplate.footerText ? 'SET' : null}
+                  />
+                  {openSections.footer && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-2 p-4 border border-border-default rounded-lg bg-warm-white"
+                    >
+                      <label className="block text-xs font-medium text-text-secondary mb-1">Footer Text <span className="text-text-muted">(max 60 chars, no variables)</span></label>
+                      <input
+                        type="text"
+                        maxLength={60}
+                        value={currentTemplate.footerText || ''}
+                        onChange={e => setCurrentTemplate({ ...currentTemplate, footerText: e.target.value })}
+                        placeholder="e.g. Powered by Our Charity Org"
+                        className="w-full px-3 py-2 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-surface"
+                      />
+                      <p className="text-xs text-text-muted mt-1 text-right">{(currentTemplate.footerText || '').length}/60</p>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/* BUTTONS SECTION */}
+                {/* ═══════════════════════════════════════════════════════ */}
+                <div>
+                  <SectionHeader
+                    label="Buttons"
+                    section="buttons"
+                    icon={PlusCircle}
+                    badge={(currentTemplate.buttons || []).length > 0 ? `${(currentTemplate.buttons || []).length}` : null}
+                  />
+                  {openSections.buttons && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-2 p-4 border border-border-default rounded-lg bg-warm-white space-y-3"
+                    >
+                      {(currentTemplate.buttons || []).map((btn, i) => (
+                        <div key={i} className="p-3 bg-surface border border-border-default rounded-lg space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Button {i + 1}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeButton(i)}
+                              className="text-text-muted hover:text-danger p-1 rounded transition-colors"
+                              title="Remove button"
+                            >
+                              <Minus size={14} />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs text-text-muted mb-0.5">Type</label>
+                              <select
+                                value={btn.type}
+                                onChange={e => updateButton(i, 'type', e.target.value)}
+                                className="w-full px-2 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg"
+                              >
+                                <option value="QUICK_REPLY">Quick Reply</option>
+                                <option value="URL">URL</option>
+                                <option value="PHONE_NUMBER">Phone Number</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-text-muted mb-0.5">Label <span className="text-text-muted">(max 25)</span></label>
+                              <input
+                                type="text"
+                                maxLength={25}
+                                value={btn.text}
+                                onChange={e => updateButton(i, 'text', e.target.value)}
+                                placeholder="Button text"
+                                className="w-full px-2 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg"
+                              />
+                            </div>
+                          </div>
+                          {btn.type === 'URL' && (
+                            <div>
+                              <label className="block text-xs text-text-muted mb-0.5">URL</label>
+                              <div className="flex items-center gap-2">
+                                <Link size={12} className="text-text-muted shrink-0" />
+                                <input
+                                  type="url"
+                                  value={btn.url || ''}
+                                  onChange={e => updateButton(i, 'url', e.target.value)}
+                                  placeholder="https://example.com"
+                                  className="w-full px-2 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg"
+                                />
+                              </div>
+                            </div>
+                          )}
+                          {btn.type === 'PHONE_NUMBER' && (
+                            <div>
+                              <label className="block text-xs text-text-muted mb-0.5">Phone Number</label>
+                              <div className="flex items-center gap-2">
+                                <Phone size={12} className="text-text-muted shrink-0" />
+                                <input
+                                  type="text"
+                                  value={btn.phoneNumber || ''}
+                                  onChange={e => updateButton(i, 'phoneNumber', e.target.value)}
+                                  placeholder="+919876543210"
+                                  className="w-full px-2 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-bg"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {(currentTemplate.buttons || []).length < 3 && (
+                        <button
+                          type="button"
+                          onClick={addButton}
+                          className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-primary bg-primary-light hover:bg-primary hover:text-white border border-primary/20 rounded-lg transition-colors"
+                        >
+                          <PlusCircle size={16} /> Add Button
+                        </button>
+                      )}
+                      {(currentTemplate.buttons || []).length >= 3 && (
+                        <p className="text-xs text-text-muted text-center">Maximum 3 buttons allowed by WhatsApp.</p>
+                      )}
+                    </motion.div>
+                  )}
                 </div>
                 
+                {/* --- Active toggle --- */}
                 <div className="flex items-center gap-2 mt-2">
                    <input
                      type="checkbox"
@@ -399,6 +685,7 @@ export default function MessageTemplatesTab() {
                    </label>
                 </div>
 
+                {/* --- Action Buttons --- */}
                 <div className="pt-4 flex justify-between gap-3 mt-auto border-t border-border-default pt-4">
                   <div className="flex gap-2">
                     {currentTemplate._id && (!currentTemplate.metaStatus || currentTemplate.metaStatus.toUpperCase() === 'DRAFT' || currentTemplate.metaStatus.toUpperCase() === 'REJECTED') && (
@@ -442,22 +729,85 @@ export default function MessageTemplatesTab() {
               </form>
             </div>
             
-            {/* Live Preview Pane */}
-            <div className="h-48 border-t border-border-default bg-[#EFEAE2] flex flex-col">
+            {/* ═══════════════════════════════════════════════════════ */}
+            {/* LIVE PREVIEW */}
+            {/* ═══════════════════════════════════════════════════════ */}
+            <div className="border-t border-border-default bg-[#EFEAE2] flex flex-col" style={{ minHeight: '220px' }}>
               <div className="px-4 py-2 bg-[#D1C6B5]/30 flex items-center gap-2 border-b border-border-strong/20">
                 <PlayCircle size={14} className="text-text-secondary" />
                 <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Live Preview</span>
               </div>
               <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
-                <div className="bg-white rounded-xl rounded-tl-sm shadow-sm p-3 inline-block max-w-[85%] relative border border-black/5 whitespace-pre-wrap text-sm text-[#111B21]">
-                  {generatePreview(currentTemplate.body)}
-                  {/* Fake WhatsApp tail */}
+                <div className="inline-block max-w-[85%] relative">
+                  <div className="bg-white rounded-xl rounded-tl-sm shadow-sm overflow-hidden border border-black/5">
+                    {/* Preview Header */}
+                    {currentTemplate.headerType && currentTemplate.headerType !== 'none' && (
+                      <div>
+                        {currentTemplate.headerType === 'text' && currentTemplate.headerContent && (
+                          <div className="px-3 pt-3 pb-0">
+                            <p className="font-bold text-sm text-[#111B21]">{currentTemplate.headerContent}</p>
+                          </div>
+                        )}
+                        {currentTemplate.headerType === 'image' && (
+                          <div className="bg-[#E9E3D8] flex items-center justify-center h-32 rounded-t-xl">
+                            {currentTemplate.headerContent ? (
+                              <img src={currentTemplate.headerContent} alt="Header" className="w-full h-full object-cover rounded-t-xl" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                            ) : null}
+                            <div className={`flex flex-col items-center gap-1 text-text-muted ${currentTemplate.headerContent ? 'hidden' : 'flex'}`}>
+                              <Image size={28} />
+                              <span className="text-xs">Image</span>
+                            </div>
+                          </div>
+                        )}
+                        {currentTemplate.headerType === 'video' && (
+                          <div className="bg-[#E9E3D8] flex flex-col items-center justify-center h-32 gap-1 text-text-muted rounded-t-xl">
+                            <Video size={28} />
+                            <span className="text-xs">Video</span>
+                          </div>
+                        )}
+                        {currentTemplate.headerType === 'document' && (
+                          <div className="bg-[#E9E3D8] flex flex-col items-center justify-center h-20 gap-1 text-text-muted rounded-t-xl">
+                            <FileText size={24} />
+                            <span className="text-xs">Document (PDF)</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Preview Body */}
+                    <div className="p-3 whitespace-pre-wrap text-sm text-[#111B21]">
+                      {generatePreview(currentTemplate.body)}
+                    </div>
+                    {/* Preview Footer */}
+                    {currentTemplate.footerText && (
+                      <div className="px-3 pb-2">
+                        <p className="text-xs text-[#8696A0]">{currentTemplate.footerText}</p>
+                      </div>
+                    )}
+                  </div>
+                  {/* Preview Buttons */}
+                  {(currentTemplate.buttons || []).length > 0 && (
+                    <div className="mt-1 space-y-1">
+                      {(currentTemplate.buttons || []).map((btn, i) => (
+                        <div key={i} className="bg-white rounded-lg shadow-sm border border-black/5 text-center py-2 px-3">
+                          <span className="text-sm font-medium text-[#00A5E0] flex items-center justify-center gap-1.5">
+                            {btn.type === 'URL' && <Link size={13} />}
+                            {btn.type === 'PHONE_NUMBER' && <Phone size={13} />}
+                            {btn.text || 'Button'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* WhatsApp tail */}
                   <div className="absolute top-0 -left-2 w-0 h-0 border-t-[0px] border-t-transparent border-r-[12px] border-r-white border-b-[12px] border-b-transparent"></div>
                 </div>
               </div>
             </div>
           </div>
         ) : currentTemplate._id ? (
+          /* ═══════════════════════════════════════════════════════ */
+          /* READ-ONLY PREVIEW for selected template */
+          /* ═══════════════════════════════════════════════════════ */
           <div className="flex flex-col h-full bg-[#EFEAE2]">
             <div className="p-4 border-b border-border-default bg-warm-white flex justify-between items-center">
               <h2 className="font-semibold text-text-primary flex items-center gap-2">
@@ -471,13 +821,63 @@ export default function MessageTemplatesTab() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-8 flex justify-center items-start">
-              <div className="bg-white rounded-xl rounded-tl-sm shadow-sm p-4 inline-block max-w-md w-full relative border border-black/5 whitespace-pre-wrap text-[#111B21]">
-                {generatePreview(currentTemplate.body)}
+              <div className="inline-block max-w-md w-full relative">
+                <div className="bg-white rounded-xl rounded-tl-sm shadow-sm overflow-hidden border border-black/5">
+                  {/* Header */}
+                  {currentTemplate.headerType && currentTemplate.headerType !== 'none' && (
+                    <div>
+                      {currentTemplate.headerType === 'text' && currentTemplate.headerContent && (
+                        <div className="px-4 pt-4 pb-0">
+                          <p className="font-bold text-[#111B21]">{currentTemplate.headerContent}</p>
+                        </div>
+                      )}
+                      {currentTemplate.headerType === 'image' && (
+                        <div className="bg-[#E9E3D8] flex items-center justify-center h-40">
+                          {currentTemplate.headerContent ? (
+                            <img src={currentTemplate.headerContent} alt="Header" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="flex flex-col items-center gap-1 text-text-muted"><Image size={32} /><span className="text-xs">Image</span></div>
+                          )}
+                        </div>
+                      )}
+                      {currentTemplate.headerType === 'video' && (
+                        <div className="bg-[#E9E3D8] flex flex-col items-center justify-center h-40 gap-1 text-text-muted"><Video size={32} /><span className="text-xs">Video</span></div>
+                      )}
+                      {currentTemplate.headerType === 'document' && (
+                        <div className="bg-[#E9E3D8] flex flex-col items-center justify-center h-24 gap-1 text-text-muted"><FileText size={28} /><span className="text-xs">Document (PDF)</span></div>
+                      )}
+                    </div>
+                  )}
+                  <div className="p-4 whitespace-pre-wrap text-[#111B21]">
+                    {generatePreview(currentTemplate.body)}
+                  </div>
+                  {currentTemplate.footerText && (
+                    <div className="px-4 pb-3">
+                      <p className="text-xs text-[#8696A0]">{currentTemplate.footerText}</p>
+                    </div>
+                  )}
+                </div>
+                {(currentTemplate.buttons || []).length > 0 && (
+                  <div className="mt-1 space-y-1">
+                    {(currentTemplate.buttons || []).map((btn, i) => (
+                      <div key={i} className="bg-white rounded-lg shadow-sm border border-black/5 text-center py-2.5 px-3">
+                        <span className="text-sm font-medium text-[#00A5E0] flex items-center justify-center gap-1.5">
+                          {btn.type === 'URL' && <Link size={13} />}
+                          {btn.type === 'PHONE_NUMBER' && <Phone size={13} />}
+                          {btn.text || 'Button'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="absolute top-0 -left-2 w-0 h-0 border-t-[0px] border-t-transparent border-r-[12px] border-r-white border-b-[12px] border-b-transparent"></div>
               </div>
             </div>
           </div>
         ) : (
+          /* ═══════════════════════════════════════════════════════ */
+          /* EMPTY STATE */
+          /* ═══════════════════════════════════════════════════════ */
           <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-warm-white/50">
             <div className="w-16 h-16 bg-primary-light text-primary rounded-full flex items-center justify-center mb-4 opacity-80">
               <MessageSquareText size={32} />

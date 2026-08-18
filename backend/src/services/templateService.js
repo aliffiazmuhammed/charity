@@ -4,8 +4,8 @@ import { MessageTemplate } from '../models/MessageTemplate.js';
  * Create a new message template.
  * If isActive is true, the pre-save hook deactivates all others.
  */
-export const createTemplate = async ({ name, body, isActive = false, metaTemplateName, language, metaCategory }) => {
-  const template = new MessageTemplate({ name, body, isActive, metaTemplateName, language, metaCategory });
+export const createTemplate = async ({ name, body, isActive = false, metaTemplateName, language, metaCategory, headerType, headerContent, footerText, buttons }) => {
+  const template = new MessageTemplate({ name, body, isActive, metaTemplateName, language, metaCategory, headerType, headerContent, footerText, buttons });
   return await template.save();
 };
 
@@ -40,6 +40,10 @@ export const updateTemplate = async (id, data) => {
   if (data.metaTemplateName !== undefined) template.metaTemplateName = data.metaTemplateName;
   if (data.language !== undefined) template.language = data.language;
   if (data.metaCategory !== undefined) template.metaCategory = data.metaCategory;
+  if (data.headerType !== undefined) template.headerType = data.headerType;
+  if (data.headerContent !== undefined) template.headerContent = data.headerContent;
+  if (data.footerText !== undefined) template.footerText = data.footerText;
+  if (data.buttons !== undefined) template.buttons = data.buttons;
 
   // .save() triggers the pre-save hook for single-active enforcement
   return await template.save();

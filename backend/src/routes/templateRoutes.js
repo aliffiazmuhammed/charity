@@ -66,13 +66,13 @@ router.post('/sync-meta', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, body, isActive, metaTemplateName, language, metaCategory } = req.body;
+    const { name, body, isActive, metaTemplateName, language, metaCategory, headerType, headerContent, footerText, buttons } = req.body;
 
     if (!name || !body) {
       return res.status(400).json({ error: 'Template name and body are required' });
     }
 
-    const template = await createTemplate({ name, body, isActive, metaTemplateName, language, metaCategory });
+    const template = await createTemplate({ name, body, isActive, metaTemplateName, language, metaCategory, headerType, headerContent, footerText, buttons });
     res.status(201).json(template);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -85,8 +85,8 @@ router.post('/', async (req, res) => {
  */
 router.put('/:id', async (req, res) => {
   try {
-    const { name, body, isActive, metaTemplateName, language, metaCategory } = req.body;
-    const template = await updateTemplate(req.params.id, { name, body, isActive, metaTemplateName, language, metaCategory });
+    const { name, body, isActive, metaTemplateName, language, metaCategory, headerType, headerContent, footerText, buttons } = req.body;
+    const template = await updateTemplate(req.params.id, { name, body, isActive, metaTemplateName, language, metaCategory, headerType, headerContent, footerText, buttons });
     res.json(template);
   } catch (error) {
     const status = error.message === 'Template not found' ? 404 : 400;
