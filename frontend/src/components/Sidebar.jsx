@@ -17,8 +17,8 @@ export default function Sidebar({ tabs, activeTab, setActiveTab, onLogout }) {
 
       {/* Profile Section */}
       <div className={`p-6 pb-4 border-b border-border-default/50 flex ${isCollapsed ? 'justify-center items-center px-2' : 'items-center gap-3'}`}>
-        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30 shadow-inner shrink-0">
-          <UserCircle size={28} className="text-primary" />
+        <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center border border-border-default shadow-inner shrink-0 overflow-hidden">
+          <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
         </div>
         {!isCollapsed && (
           <div className="overflow-hidden">
