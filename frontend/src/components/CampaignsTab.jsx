@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { getTemplates } from '../services/templateService';
 import { getCampaignHistory, sendCampaign } from '../services/campaignService';
 import { getAllDonors } from '../services/donorService';
-import { Upload, Users, Calendar, Send, BarChart2, RefreshCw } from 'lucide-react';
+import api from '../config/api';
+import { Upload, Users, Calendar, Send, BarChart2, RefreshCw, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
@@ -31,6 +32,9 @@ export default function CampaignsTab({ onViewLogs }) {
   const [campaignPage, setCampaignPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
 
+  const [dailyLimit, setDailyLimit] = useState(null);
+  const [dailyLimitRemaining, setDailyLimitRemaining] = useState(null);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -49,6 +53,15 @@ export default function CampaignsTab({ onViewLogs }) {
 
       const dns = await getAllDonors({ limit: 10000 });
       setDonors(dns.donors || dns || []);
+
+      // Fetch daily limit stats
+      try {
+        const usageRes = await api.get('/whatsapp/usage');
+        setDailyLimit(usageRes.data.dailyLimit);
+        setDailyLimitRemaining(usageRes.data.today.remaining);
+      } catch (usageErr) {
+        console.error('Failed to fetch usage limits', usageErr);
+      }
     } catch (err) {
       console.error(err);
       setMessage('Failed to load data.');
@@ -142,8 +155,13 @@ export default function CampaignsTab({ onViewLogs }) {
         scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null
       };
 
-      await sendCampaign(payload);
-      setMessage('Campaign launched successfully!');
+      const res = await sendCampaign(payload);
+      
+      if (res && res.summary && res.summary.message) {
+        setMessage(res.summary.message);
+      } else {
+        setMessage('Campaign launched successfully!');
+      }
       
       setRecipients([]);
       setScheduledAt('');
@@ -317,12 +335,30 @@ export default function CampaignsTab({ onViewLogs }) {
                 </div>
               </div>
               
-              <div className="pt-4 border-t border-border-default flex items-center justify-between mt-auto">
-                <div className="flex flex-col">
-                  <div className="text-sm font-medium text-text-primary">
-                    {recipients.length} Recipient(s) Selected
+              <div className="pt-4 border-t border-border-default flex flex-col gap-4 mt-auto">
+                {dailyLimitRemaining !== null && recipients.length > 0 && (
+                  <div className={`p-3 rounded-lg text-sm flex items-start gap-2 ${recipients.length > dailyLimitRemaining ? 'bg-yellow-50 text-yellow-800 border border-yellow-200' : 'bg-blue-50 text-blue-800 border border-blue-200'}`}>
+                    <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold mb-1">Daily Limit Check</p>
+                      <p>
+                        You have <strong>{dailyLimitRemaining}</strong> messages remaining today. 
+                        {recipients.length <= dailyLimitRemaining ? (
+                          <span> All {recipients.length} selected recipients will be sent today.</span>
+                        ) : (
+                          <span> The first {dailyLimitRemaining} will be sent today, and the remaining {recipients.length - dailyLimitRemaining} will be automatically queued for tomorrow.</span>
+                        )}
+                      </p>
+                    </div>
                   </div>
-                  {recipients.length > 0 && (
+                )}
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <div className="text-sm font-medium text-text-primary">
+                      {recipients.length} Recipient(s) Selected
+                    </div>
+                    {recipients.length > 0 && (
                     <button onClick={() => setShowRecipientsModal(true)} className="text-primary hover:underline text-xs text-left mt-0.5">
                       View/Edit List
                     </button>
@@ -335,6 +371,7 @@ export default function CampaignsTab({ onViewLogs }) {
                 >
                   {loading ? 'Launching...' : 'Launch Campaign'} <Send size={16} />
                 </button>
+                </div>
               </div>
             </div>
           </div>
