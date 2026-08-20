@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getInboxConversations, getInboxChat, sendInboxReply } from '../services/inboxService';
-import { Search, Send, User, MessageCircle, Clock, RefreshCw } from 'lucide-react';
+import { Search, Send, User, MessageCircle, Clock, RefreshCw, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function InboxTab() {
@@ -88,10 +88,10 @@ export default function InboxTab() {
   );
 
   return (
-    <div className="bg-surface rounded-xl shadow-card border border-border-default h-[75vh] flex overflow-hidden">
+    <div className="bg-surface rounded-xl shadow-card border border-border-default h-[80vh] md:h-[75vh] flex overflow-hidden relative">
       
       {/* Left Panel: Conversations List */}
-      <div className="w-1/3 border-r border-border-default flex flex-col bg-warm-white">
+      <div className={`${selectedPhone ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r border-border-default flex-col bg-warm-white absolute md:relative inset-0 z-10 md:z-0`}>
         <div className="p-4 border-b border-border-default shrink-0">
           <h2 className="text-lg font-bold text-text-primary mb-3 flex items-center justify-between">
             Inbox
@@ -153,11 +153,17 @@ export default function InboxTab() {
       </div>
 
       {/* Right Panel: Chat Window */}
-      <div className="flex-1 flex flex-col bg-bg">
+      <div className={`${!selectedPhone ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-bg absolute md:relative inset-0 z-20 md:z-0`}>
         {selectedPhone ? (
           <>
             {/* Chat Header */}
             <div className="p-4 border-b border-border-default bg-surface flex items-center gap-3 shrink-0">
+              <button 
+                onClick={() => setSelectedPhone(null)}
+                className="md:hidden p-2 -ml-2 text-text-muted hover:text-primary transition-colors"
+              >
+                <ChevronLeft size={24} />
+              </button>
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                 <User size={20} />
               </div>

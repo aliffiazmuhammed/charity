@@ -23,6 +23,7 @@ function App() {
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('activeTab') || 'dashboard';
   });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Persist active tab to localStorage
   useEffect(() => {
@@ -98,20 +99,29 @@ function App() {
       <Sidebar 
         tabs={tabs} 
         activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+        setActiveTab={(id) => {
+          setActiveTab(id);
+          setIsMobileMenuOpen(false); // Close on mobile when selecting
+        }} 
         onLogout={handleLogout} 
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden relative w-full">
         
         {/* Slim Header */}
         <header className="w-full bg-surface/80 backdrop-blur-md border-b border-border-default sticky top-0 z-10">
-          <Header onLogout={handleLogout} slim={true} />
+          <Header 
+            onLogout={handleLogout} 
+            slim={true} 
+            toggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+          />
         </header>
 
         {/* Tab Content */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 w-full overflow-x-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

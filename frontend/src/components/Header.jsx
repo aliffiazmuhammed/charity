@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '../config/api';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Menu } from 'lucide-react';
 
 const WA_STATUS_LABELS = {
   CONNECTED: 'Meta Connected',
@@ -16,7 +16,7 @@ const WA_STATUS_STYLES = {
   NOT_CONFIGURED: 'bg-warning-bg text-warning border-warning/20',
 };
 
-export default function Header({ onLogout, slim = false }) {
+export default function Header({ onLogout, slim = false, toggleMobileMenu }) {
   const [waStatus, setWaStatus] = useState('DISCONNECTED');
   const [waMessage, setWaMessage] = useState('');
 
@@ -43,10 +43,21 @@ export default function Header({ onLogout, slim = false }) {
 
   return (
     <div className={`w-full flex justify-between items-center px-6 max-w-7xl mx-auto ${slim ? 'py-2 bg-transparent' : 'py-4'}`}>
-      {/* Brand */}
-      <h1 className={`font-bold tracking-tight text-primary ${slim ? 'text-lg' : 'text-2xl'}`}>
-        Meenangadi Charitable Trust
-      </h1>
+      {/* Left side: Hamburger + Brand */}
+      <div className="flex items-center gap-3">
+        {slim && (
+          <button 
+            onClick={toggleMobileMenu}
+            className="md:hidden p-1 text-primary hover:bg-primary/10 rounded-md transition-colors"
+          >
+            <Menu size={20} />
+          </button>
+        )}
+        <h1 className={`font-bold tracking-tight text-primary ${slim ? 'text-base md:text-lg' : 'text-xl md:text-2xl'} truncate`}>
+          <span className="hidden sm:inline">Meenangadi Charitable Trust</span>
+          <span className="sm:hidden">Meenangadi Trust</span>
+        </h1>
+      </div>
 
       {/* Right side */}
       <div className="flex items-center gap-4">
@@ -55,8 +66,8 @@ export default function Header({ onLogout, slim = false }) {
           className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border transition-all ${statusStyle} cursor-help`}
           title={waStatus === 'CONNECTED' ? 'Meta API is online' : waMessage || 'Meta API is offline'}
         >
-          <MessageCircle size={12} />
-          <span>{statusLabel}</span>
+          <MessageCircle size={12} className="shrink-0" />
+          <span className="hidden sm:inline">{statusLabel}</span>
           {/* Pulsing dot for live states */}
           {waStatus === 'CONNECTED' && (
             <span className="relative flex h-2 w-2 ml-1">
