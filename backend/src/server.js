@@ -9,6 +9,7 @@ import donationRoutes from './routes/donationRoutes.js';
 import donorRoutes from './routes/donorRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 import templateRoutes from './routes/templateRoutes.js';
+import contactRoutes from './routes/contactRoutes.js';
 import { startCampaignScheduler } from './services/campaignScheduler.js';
 
 
@@ -44,6 +45,7 @@ app.use('/api/donations', auth, donationRoutes);
 app.use('/api/donors', auth, donorRoutes);
 app.use('/api/templates', auth, templateRoutes);
 app.use('/api/campaigns', auth, campaignRoutes);
+app.use('/api/contacts', auth, contactRoutes);
 
 // ── Global Error Handler ────────────────────────────────────────────
 

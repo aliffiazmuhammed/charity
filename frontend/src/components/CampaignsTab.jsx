@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { getTemplates } from '../services/templateService';
 import { getCampaignHistory, sendCampaign } from '../services/campaignService';
 import { getAllDonors } from '../services/donorService';
+import { getContacts, getContactTags } from '../services/contactService';
 import api from '../config/api';
-import { Upload, Users, Calendar, Send, BarChart2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Upload, Users, Calendar, Send, BarChart2, RefreshCw, AlertCircle, Contact2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import CampaignDetailsModal from './CampaignDetailsModal';
@@ -12,6 +13,8 @@ export default function CampaignsTab() {
   const [history, setHistory] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [donors, setDonors] = useState([]);
+  const [contactsList, setContactsList] = useState([]);
+  const [contactTags, setContactTags] = useState([]);
 
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [campaignName, setCampaignName] = useState('');
@@ -19,11 +22,14 @@ export default function CampaignsTab() {
   
   // Recipients
   const [recipients, setRecipients] = useState([]); // [{phone, name, amount, date}]
+  const [recipientSource, setRecipientSource] = useState('donors'); // 'donors' | 'contacts'
   
   // UI states
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [donorSearch, setDonorSearch] = useState('');
+  const [contactSearch, setContactSearch] = useState('');
+  const [contactTagFilter, setContactTagFilter] = useState('');
   const [manualEntry, setManualEntry] = useState({ name: '', phone: '' });
   const [showRecipientsModal, setShowRecipientsModal] = useState(false);
 
@@ -56,6 +62,16 @@ export default function CampaignsTab() {
 
       const dns = await getAllDonors({ limit: 10000 });
       setDonors(dns.donors || dns || []);
+
+      // Fetch contacts for the recipient selector
+      try {
+        const contactsRes = await getContacts({ limit: 10000 });
+        setContactsList(contactsRes.contacts || []);
+        const tags = await getContactTags();
+        setContactTags(tags);
+      } catch (contactErr) {
+        console.error('Failed to fetch contacts', contactErr);
+      }
 
       // Fetch daily limit stats
       try {
@@ -108,6 +124,19 @@ export default function CampaignsTab() {
       setRecipients([...recipients, {
         phone: donor.phone,
         name: donor.donorName || donor.name || 'Unknown',
+        amount: '₹0',
+        date: format(new Date(), 'dd MMM yyyy')
+      }]);
+    }
+  };
+
+  const handleContactSelect = (contact) => {
+    if (recipients.some(r => r.phone === contact.phone)) {
+      setRecipients(recipients.filter(r => r.phone !== contact.phone));
+    } else {
+      setRecipients([...recipients, {
+        phone: contact.phone,
+        name: contact.name || 'Unknown',
         amount: '₹0',
         date: format(new Date(), 'dd MMM yyyy')
       }]);
@@ -296,12 +325,49 @@ export default function CampaignsTab() {
             </div>
 
             <div className="space-y-4 flex flex-col">
-              <label className="block text-sm font-medium text-text-secondary mb-1">Or Select Existing Donors</label>
-              <div className="flex-1 border border-border-strong rounded-md overflow-hidden flex flex-col min-h-[250px] max-h-[300px]">
-                <div className="bg-warm-white px-4 py-2 border-b border-border-strong text-xs font-semibold text-text-secondary flex justify-between items-center">
-                  <span>Available Donors</span>
+              <label className="block text-sm font-medium text-text-secondary mb-1">Or Select Recipients</label>
+              <div className="flex-1 border border-border-strong rounded-md overflow-hidden flex flex-col min-h-[250px] max-h-[350px]">
+                {/* Tabs */}
+                <div className="flex bg-warm-white border-b border-border-strong">
+                  <button
+                    onClick={() => setRecipientSource('donors')}
+                    className={`flex-1 py-2 text-sm font-medium transition-colors ${recipientSource === 'donors' ? 'bg-surface text-primary border-b-2 border-primary' : 'text-text-secondary hover:text-text-primary hover:bg-surface/50'}`}
+                  >
+                    Donors
+                  </button>
+                  <button
+                    onClick={() => setRecipientSource('contacts')}
+                    className={`flex-1 py-2 text-sm font-medium transition-colors ${recipientSource === 'contacts' ? 'bg-surface text-primary border-b-2 border-primary' : 'text-text-secondary hover:text-text-primary hover:bg-surface/50'}`}
+                  >
+                    Contacts
+                  </button>
+                </div>
+
+                <div className="bg-surface px-4 py-2 border-b border-border-strong text-xs font-semibold text-text-secondary flex justify-between items-center">
+                  <span>Available {recipientSource === 'donors' ? 'Donors' : 'Contacts'}</span>
                   <div className="flex gap-3">
-                    <span className="text-primary cursor-pointer hover:underline" onClick={() => setRecipients(donors.map(d => ({phone: d.phone, name: d.donorName || d.name || 'Unknown', amount: '₹0', date: format(new Date(), 'dd MMM yyyy')})))}>
+                    <span 
+                      className="text-primary cursor-pointer hover:underline" 
+                      onClick={() => {
+                        if (recipientSource === 'donors') {
+                          // Select all donors
+                          const newDonors = donors
+                            .filter(d => !recipients.some(r => r.phone === d.phone))
+                            .map(d => ({phone: d.phone, name: d.donorName || d.name || 'Unknown', amount: '₹0', date: format(new Date(), 'dd MMM yyyy')}));
+                          setRecipients([...recipients, ...newDonors]);
+                        } else {
+                          // Select all filtered contacts
+                          const filteredContacts = contactsList.filter(c => {
+                            if (contactTagFilter && !c.tags.includes(contactTagFilter)) return false;
+                            return (c.name || '').toLowerCase().includes(contactSearch.toLowerCase()) || (c.phone || '').includes(contactSearch);
+                          });
+                          const newContacts = filteredContacts
+                            .filter(c => !recipients.some(r => r.phone === c.phone))
+                            .map(c => ({phone: c.phone, name: c.name || 'Unknown', amount: '₹0', date: format(new Date(), 'dd MMM yyyy')}));
+                          setRecipients([...recipients, ...newContacts]);
+                        }
+                      }}
+                    >
                       Select All
                     </span>
                     <span className="text-primary cursor-pointer hover:underline" onClick={() => setRecipients([])}>
@@ -309,33 +375,93 @@ export default function CampaignsTab() {
                     </span>
                   </div>
                 </div>
-                <div className="px-3 py-2 border-b border-border-strong bg-bg">
-                  <input
-                    type="text"
-                    placeholder="Search available donors..."
-                    value={donorSearch}
-                    onChange={e => setDonorSearch(e.target.value)}
-                    className="w-full px-3 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <div className="flex-1 overflow-y-auto p-2">
-                  {donors.filter(d => (d.donorName || d.name || '').toLowerCase().includes(donorSearch.toLowerCase()) || (d.phone || '').includes(donorSearch)).length === 0 ? (
-                    <div className="text-center text-text-muted py-4 text-sm">No donors found</div>
-                  ) : donors.filter(d => (d.donorName || d.name || '').toLowerCase().includes(donorSearch.toLowerCase()) || (d.phone || '').includes(donorSearch)).map(donor => (
-                    <label key={donor.phone} className="flex items-center gap-3 p-2 hover:bg-bg rounded cursor-pointer transition-colors">
+
+                {recipientSource === 'donors' ? (
+                  <>
+                    <div className="px-3 py-2 border-b border-border-strong bg-bg">
                       <input
-                        type="checkbox"
-                        checked={recipients.some(r => r.phone === donor.phone)}
-                        onChange={() => handleDonorSelect(donor)}
-                        className="text-primary focus:ring-primary w-4 h-4 rounded border-border-strong"
+                        type="text"
+                        placeholder="Search available donors..."
+                        value={donorSearch}
+                        onChange={e => setDonorSearch(e.target.value)}
+                        className="w-full px-3 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
                       />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-text-primary">{donor.donorName || donor.name || 'Unknown'}</span>
-                        <span className="text-xs text-text-muted">{donor.phone}</span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2">
+                      {donors.filter(d => (d.donorName || d.name || '').toLowerCase().includes(donorSearch.toLowerCase()) || (d.phone || '').includes(donorSearch)).length === 0 ? (
+                        <div className="text-center text-text-muted py-4 text-sm">No donors found</div>
+                      ) : donors.filter(d => (d.donorName || d.name || '').toLowerCase().includes(donorSearch.toLowerCase()) || (d.phone || '').includes(donorSearch)).map(donor => (
+                        <label key={donor.phone} className="flex items-center gap-3 p-2 hover:bg-bg rounded cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={recipients.some(r => r.phone === donor.phone)}
+                            onChange={() => handleDonorSelect(donor)}
+                            className="text-primary focus:ring-primary w-4 h-4 rounded border-border-strong"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-text-primary">{donor.donorName || donor.name || 'Unknown'}</span>
+                            <span className="text-xs text-text-muted">{donor.phone}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="px-3 py-2 border-b border-border-strong bg-bg flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Search contacts..."
+                        value={contactSearch}
+                        onChange={e => setContactSearch(e.target.value)}
+                        className="flex-1 px-3 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <select 
+                        value={contactTagFilter}
+                        onChange={e => setContactTagFilter(e.target.value)}
+                        className="w-24 md:w-32 px-2 py-1.5 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="">All Tags</option>
+                        {contactTags.map(tag => (
+                          <option key={tag} value={tag}>{tag}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2">
+                      {contactsList.filter(c => {
+                        if (contactTagFilter && !c.tags?.includes(contactTagFilter)) return false;
+                        return (c.name || '').toLowerCase().includes(contactSearch.toLowerCase()) || (c.phone || '').includes(contactSearch);
+                      }).length === 0 ? (
+                        <div className="text-center text-text-muted py-4 text-sm">No contacts found</div>
+                      ) : contactsList.filter(c => {
+                        if (contactTagFilter && !c.tags?.includes(contactTagFilter)) return false;
+                        return (c.name || '').toLowerCase().includes(contactSearch.toLowerCase()) || (c.phone || '').includes(contactSearch);
+                      }).map(contact => (
+                        <label key={contact.phone} className="flex flex-col p-2 hover:bg-bg rounded cursor-pointer transition-colors border-b border-border-default/50 last:border-0">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={recipients.some(r => r.phone === contact.phone)}
+                              onChange={() => handleContactSelect(contact)}
+                              className="text-primary focus:ring-primary w-4 h-4 rounded border-border-strong"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium text-text-primary">{contact.name || 'Unknown'}</span>
+                              <span className="text-xs text-text-muted">{contact.phone}</span>
+                            </div>
+                          </div>
+                          {contact.tags && contact.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 ml-7 mt-1">
+                              {contact.tags.map(t => (
+                                <span key={t} className="px-1.5 py-0.5 rounded text-[10px] bg-warm-white border border-border-default text-text-secondary">{t}</span>
+                              ))}
+                            </div>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
               
               <div className="pt-4 border-t border-border-default flex flex-col gap-4 mt-auto">
