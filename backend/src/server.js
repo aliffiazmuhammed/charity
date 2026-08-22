@@ -10,9 +10,8 @@ import donorRoutes from './routes/donorRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 import templateRoutes from './routes/templateRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
-import uploadRoutes from './routes/uploadRoutes.js';
 import { startCampaignScheduler } from './services/campaignScheduler.js';
-import path from 'path';
+
 
 
 const app = express();
@@ -27,7 +26,6 @@ startCampaignScheduler();
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // ── Public Routes (no authentication required) ──────────────────────
 
@@ -48,7 +46,6 @@ app.use('/api/donors', auth, donorRoutes);
 app.use('/api/templates', auth, templateRoutes);
 app.use('/api/campaigns', auth, campaignRoutes);
 app.use('/api/contacts', auth, contactRoutes);
-app.use('/api/upload', auth, uploadRoutes);
 
 // ── Global Error Handler ────────────────────────────────────────────
 

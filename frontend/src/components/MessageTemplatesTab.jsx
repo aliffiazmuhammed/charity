@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import {
   MessageSquareText, Plus, Check, Edit2, Trash2, X, PlayCircle, Info, RefreshCw, Send,
-  ChevronDown, ChevronRight, Image, FileText, Video, Link, Phone, Type, PlusCircle, Minus, Upload
+  ChevronDown, ChevronRight, Image, FileText, Video, Link, Phone, Type, PlusCircle, Minus
 } from 'lucide-react';
 import {
   getTemplates,
@@ -12,8 +12,7 @@ import {
   activateTemplate,
   deleteTemplate,
   syncMetaTemplates,
-  submitToMeta,
-  uploadMedia
+  submitToMeta
 } from '../services/templateService';
 
 const DEFAULT_TEMPLATE = {
@@ -115,7 +114,6 @@ export default function MessageTemplatesTab() {
   const [currentTemplate, setCurrentTemplate] = useState({ ...DEFAULT_TEMPLATE });
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 
   // Collapsible section state
   const [openSections, setOpenSections] = useState({ header: false, footer: false, buttons: false });
@@ -137,28 +135,6 @@ export default function MessageTemplatesTab() {
       console.error(err);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    // Check size limit (e.g. 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg('File exceeds 5MB limit.');
-      return;
-    }
-
-    setIsUploadingMedia(true);
-    setErrorMsg('');
-    try {
-      const res = await uploadMedia(file);
-      setCurrentTemplate({ ...currentTemplate, headerContent: res.url });
-    } catch (err) {
-      setErrorMsg(err.response?.data?.error || 'Failed to upload media.');
-    } finally {
-      setIsUploadingMedia(false);
     }
   };
 
@@ -599,43 +575,21 @@ export default function MessageTemplatesTab() {
                       {['image', 'video', 'document'].includes(currentTemplate.headerType) && (
                         <div>
                           <label className="block text-xs font-medium text-text-secondary mb-1">
-                            {currentTemplate.headerType === 'image' && 'Image File / URL'}
-                            {currentTemplate.headerType === 'video' && 'Video File / URL'}
-                            {currentTemplate.headerType === 'document' && 'Document (PDF) File / URL'}
+                            {currentTemplate.headerType === 'image' && 'Image URL'}
+                            {currentTemplate.headerType === 'video' && 'Video URL'}
+                            {currentTemplate.headerType === 'document' && 'Document URL (PDF)'}
                           </label>
-                          <div className="flex flex-col gap-2">
-                            {/* File Upload */}
-                            <div className="flex items-center gap-2">
-                              <label className={`flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 text-sm border border-border-strong rounded-md cursor-pointer transition-colors ${isUploadingMedia ? 'bg-surface text-text-muted cursor-not-allowed' : 'bg-warm-white hover:bg-surface text-text-secondary hover:text-text-primary'}`}>
-                                {isUploadingMedia ? (
-                                  <RefreshCw size={14} className="animate-spin" />
-                                ) : (
-                                  <Upload size={14} />
-                                )}
-                                {isUploadingMedia ? 'Uploading...' : 'Upload File'}
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  accept={currentTemplate.headerType === 'image' ? 'image/*' : currentTemplate.headerType === 'video' ? 'video/mp4' : 'application/pdf'}
-                                  onChange={handleFileUpload}
-                                  disabled={isUploadingMedia}
-                                />
-                              </label>
-                              <span className="text-xs text-text-muted font-medium uppercase px-2">OR</span>
-                              <div className="flex-1 flex items-center gap-2 relative">
-                                <Link size={14} className="absolute left-3 text-text-muted shrink-0" />
-                                <input
-                                  type="url"
-                                  value={currentTemplate.headerContent || ''}
-                                  onChange={e => setCurrentTemplate({ ...currentTemplate, headerContent: e.target.value })}
-                                  placeholder="https://example.com/file.jpg"
-                                  className="w-full pl-8 pr-3 py-2 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-surface"
-                                  disabled={isUploadingMedia}
-                                />
-                              </div>
-                            </div>
-                            <p className="text-xs text-text-muted mt-1">Upload a file (max 5MB) or paste a publicly hosted URL.</p>
+                          <div className="flex items-center gap-2">
+                            <Link size={14} className="text-text-muted shrink-0" />
+                            <input
+                              type="url"
+                              value={currentTemplate.headerContent || ''}
+                              onChange={e => setCurrentTemplate({ ...currentTemplate, headerContent: e.target.value })}
+                              placeholder="https://example.com/file.jpg"
+                              className="w-full px-3 py-2 text-sm border border-border-strong rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-surface"
+                            />
                           </div>
+                          <p className="text-xs text-text-muted mt-1">Paste a publicly hosted URL for this media.</p>
                         </div>
                       )}
                     </motion.div>
