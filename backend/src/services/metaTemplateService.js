@@ -59,6 +59,51 @@ const convertPlaceholders = (body) => {
 };
 
 /**
+ * Upload media for use in template headers.
+ * Returns a media handle that can be used in template creation.
+ */
+export const uploadMediaForTemplate = async (fileUrl, fileType) => {
+  try {
+    // 1. Download the file from the provided URL
+    const imgRes = await axios.get(fileUrl, { responseType: 'arraybuffer' });
+    const buffer = Buffer.from(imgRes.data, 'binary');
+    const fileLength = buffer.length;
+
+    // Map template headerType to MIME type
+    let mimeType = 'application/octet-stream';
+    if (fileType.toLowerCase() === 'image') mimeType = 'image/jpeg';
+    if (fileType.toLowerCase() === 'document') mimeType = 'application/pdf';
+    if (fileType.toLowerCase() === 'video') mimeType = 'video/mp4';
+
+    const GRAPH_URL = `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION || 'v21.0'}`;
+
+    // 2. Start upload session
+    const sessionRes = await axios.post(
+      `${GRAPH_URL}/app/uploads?file_length=${fileLength}&file_type=${mimeType}`,
+      {},
+      { headers: { Authorization: `Bearer ${ACCESS_TOKEN}` } }
+    );
+    const sessionId = sessionRes.data.id;
+
+    // 3. Upload file bytes
+    const uploadRes = await axios.post(
+      `${GRAPH_URL}/${sessionId}`,
+      buffer,
+      {
+        headers: {
+          Authorization: `OAuth ${ACCESS_TOKEN}`,
+          file_offset: 0
+        }
+      }
+    );
+    
+    return uploadRes.data.h; // Return the header_handle
+  } catch (error) {
+    throw new Error(`Media upload failed: ${error.message}`);
+  }
+};
+
+/**
  * Submit a template to Meta for approval.
  * @param {ObjectId} templateId - Local MongoDB template ID
  */
@@ -82,12 +127,16 @@ export const submitTemplateToMeta = async (templateId) => {
       });
     } else {
       // Media header (IMAGE, DOCUMENT, VIDEO)
+      let headerHandle = undefined;
+      if (template.headerContent) {
+        // Upload the media from URL to Meta's Resumable Upload API to get a handle
+        headerHandle = await uploadMediaForTemplate(template.headerContent, template.headerType);
+      }
+      
       components.push({
         type: 'HEADER',
         format: template.headerType.toUpperCase(),
-        example: template.headerContent
-          ? { header_handle: [template.headerContent] }
-          : undefined,
+        example: headerHandle ? { header_handle: [headerHandle] } : undefined,
       });
     }
   }
@@ -297,17 +346,3 @@ export const syncAllTemplateStatuses = async () => {
   return results;
 };
 
-/**
- * Upload media for use in template headers.
- * Returns a media handle that can be used in template creation.
- */
-export const uploadMediaForTemplate = async (fileUrl, fileType) => {
-  try {
-    // For template creation, Meta requires a session-based upload or a hosted URL
-    // The simplest approach is to use a publicly hosted URL in the template
-    // This function is a placeholder for more advanced upload flows
-    return { url: fileUrl, type: fileType };
-  } catch (error) {
-    throw new Error(`Media upload failed: ${error.message}`);
-  }
-};
