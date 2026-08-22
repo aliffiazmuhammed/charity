@@ -205,8 +205,17 @@ export const submitTemplateToMeta = async (templateId) => {
     return { success: true, metaId: response.data.id, metaName, status: 'pending' };
   } catch (error) {
     const errData = error.response?.data?.error || {};
-    const errMsg = errData.message || error.message;
+    let errMsg = errData.message || error.message;
+
+    // Check if Meta provided a more descriptive user-facing error message
+    if (errData.error_user_msg) {
+      errMsg = `${errData.error_user_title ? errData.error_user_title + ': ' : ''}${errData.error_user_msg}`;
+    } else if (errData.error_subcode) {
+      errMsg += ` (Subcode: ${errData.error_subcode})`;
+    }
+
     console.error(`[Meta Templates] ❌ Failed to submit "${metaName}":`, errMsg);
+    if (errData) console.error('Full Meta Error:', JSON.stringify(errData, null, 2));
 
     // If it's a duplicate name error, the template might already exist
     if (errData.code === 100 && errMsg.includes('already exists')) {
