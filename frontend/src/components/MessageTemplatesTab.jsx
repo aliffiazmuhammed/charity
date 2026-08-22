@@ -868,7 +868,7 @@ export default function MessageTemplatesTab() {
             {/* ═══════════════════════════════════════════════════════ */}
             {/* LIVE PREVIEW */}
             {/* ═══════════════════════════════════════════════════════ */}
-            <div className="border-t border-border-default bg-[#EFEAE2] flex flex-col" style={{ minHeight: '220px' }}>
+            <div className="border-t border-border-default bg-[#EFEAE2] flex flex-col shrink-0" style={{ minHeight: '220px', maxHeight: '40%' }}>
               <div className="px-4 py-2 bg-[#D1C6B5]/30 flex items-center gap-2 border-b border-border-strong/20">
                 <PlayCircle size={14} className="text-text-secondary" />
                 <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Live Preview</span>
