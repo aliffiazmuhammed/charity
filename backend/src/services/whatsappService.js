@@ -150,6 +150,7 @@ export const sendThankYouMessage = async (phone, donorName, amount, date, metaTe
     // If no template name given, find the active template from DB
     let templateName = metaTemplateName;
     let languageCode = 'en';
+    let templateBody = '';
 
     if (!templateName) {
       const activeTemplate = await MessageTemplate.findOne({ isActive: true, metaStatus: { $regex: /^approved$/i } });
@@ -159,6 +160,10 @@ export const sendThankYouMessage = async (phone, donorName, amount, date, metaTe
       }
       templateName = activeTemplate.metaTemplateName;
       languageCode = activeTemplate.language || 'en';
+      templateBody = activeTemplate.body || '';
+    } else {
+      const tpl = await MessageTemplate.findOne({ metaTemplateName: templateName });
+      if (tpl) templateBody = tpl.body || '';
     }
 
     if (!templateName) {
@@ -174,11 +179,35 @@ export const sendThankYouMessage = async (phone, donorName, amount, date, metaTe
       year: 'numeric',
     });
 
+    // Extract required parameters from template body
+    const requiredParams = [];
+    if (templateBody) {
+      const regex = /\{\{(\w+)\}\}/g;
+      let match;
+      const seen = new Set();
+      while ((match = regex.exec(templateBody)) !== null) {
+        if (!seen.has(match[1])) {
+          seen.add(match[1]);
+          requiredParams.push(match[1]);
+        }
+      }
+    }
+
+    const availableVars = {
+      donorName,
+      name: donorName,
+      amount: formattedAmount,
+      date: formattedDate,
+      phone
+    };
+
+    const bodyParams = requiredParams.map(param => availableVars[param] || '');
+
     return await sendTemplateMessage(
       phone,
       templateName,
       languageCode,
-      [donorName, formattedAmount, formattedDate],
+      bodyParams,
       {},
       { messageType: 'thank_you', recipientName: donorName }
     );

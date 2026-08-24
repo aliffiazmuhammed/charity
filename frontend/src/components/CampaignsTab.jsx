@@ -175,15 +175,43 @@ export default function CampaignsTab() {
     setMessage('');
 
     try {
+      // Extract required parameters from template body to match Meta's expected count and order
+      const requiredParams = [];
+      if (tpl.body) {
+        const regex = /\{\{(\w+)\}\}/g;
+        let match;
+        const seen = new Set();
+        while ((match = regex.exec(tpl.body)) !== null) {
+          if (!seen.has(match[1])) {
+            seen.add(match[1]);
+            requiredParams.push(match[1]);
+          }
+        }
+      }
+
       const payload = {
         templateName: tpl.metaTemplateName,
         campaignName: campaignName.trim(),
         languageCode: tpl.language || 'en',
-        recipients: recipients.map(r => ({
-          phone: r.phone,
-          name: r.name,
-          params: [r.name, r.amount, r.date]
-        })),
+        recipients: recipients.map(r => {
+          // Map standard recipient fields to possible template variables
+          const recipientVars = {
+            donorName: r.name,
+            name: r.name,
+            amount: r.amount || '₹0',
+            date: r.date || format(new Date(), 'dd MMM yyyy'),
+            phone: r.phone
+          };
+
+          // Build the params array in the exact order the template expects
+          const params = requiredParams.map(param => recipientVars[param] || '');
+
+          return {
+            phone: r.phone,
+            name: r.name,
+            params
+          };
+        }),
         scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null
       };
 
