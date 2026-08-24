@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, AlertCircle } from 'lucide-react';
+import { X, AlertCircle, Search } from 'lucide-react';
 import { getDonations } from '../services/donationService';
 import { format } from 'date-fns';
 
 export default function CareOfDetailsModal({ isOpen, onClose, careOfName }) {
   const [donations, setDonations] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (isOpen && careOfName) {
       loadDonations();
+      setSearchQuery('');
     }
   }, [isOpen, careOfName]);
 
@@ -26,6 +28,12 @@ export default function CareOfDetailsModal({ isOpen, onClose, careOfName }) {
       setIsLoading(false);
     }
   };
+
+  const filteredDonations = donations.filter(d => 
+    d.donorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    d.phone.includes(searchQuery) ||
+    (d.note && d.note.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   if (!isOpen) return null;
 
@@ -43,11 +51,24 @@ export default function CareOfDetailsModal({ isOpen, onClose, careOfName }) {
           <div className="flex justify-between items-center p-4 border-b border-border-default bg-warm-white flex-shrink-0">
             <div>
               <h2 className="text-lg font-semibold text-text-primary">Donations for Care Of: {careOfName}</h2>
-              <p className="text-sm text-text-muted">Showing recent donations</p>
+              <p className="text-sm text-text-muted">Total {donations.length} donations</p>
             </div>
             <button onClick={onClose} className="text-text-muted hover:text-danger transition-colors">
               <X size={20} />
             </button>
+          </div>
+
+          <div className="p-4 border-b border-border-default bg-surface">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+              <input
+                type="text"
+                placeholder="Search donors by name, phone or note..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-border-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm bg-bg"
+              />
+            </div>
           </div>
 
           <div className="overflow-y-auto p-4 flex-grow">
@@ -55,10 +76,10 @@ export default function CareOfDetailsModal({ isOpen, onClose, careOfName }) {
               <div className="flex justify-center p-8">
                 <span className="text-text-muted">Loading donations...</span>
               </div>
-            ) : donations.length === 0 ? (
+            ) : filteredDonations.length === 0 ? (
               <div className="flex flex-col items-center gap-2 p-8 text-text-muted">
                 <AlertCircle size={24} className="text-warning" />
-                <p>No donations found for this person.</p>
+                <p>{donations.length === 0 ? 'No donations found for this person.' : 'No donors match your search.'}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -73,7 +94,7 @@ export default function CareOfDetailsModal({ isOpen, onClose, careOfName }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {donations.map(d => (
+                    {filteredDonations.map(d => (
                       <tr key={d._id} className="border-b border-border-default hover:bg-warm-white transition-colors">
                         <td className="p-3 text-sm text-text-secondary">
                           {format(new Date(d.date), 'dd/MM/yyyy')}
