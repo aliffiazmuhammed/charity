@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { MessageLog } from '../models/MessageLog.js';
+import { MessageTemplate } from '../models/MessageTemplate.js';
 
 const API_VERSION = process.env.WHATSAPP_API_VERSION || 'v21.0';
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -28,6 +29,20 @@ const RATE_LIMIT_PAUSE = 60000;  // Pause 60s if rate limited
 
 let isProcessing = false;
 
+// Cache templates to avoid querying DB for every message
+const templateCache = new Map();
+
+const getTemplate = async (templateName) => {
+  if (templateCache.has(templateName)) {
+    return templateCache.get(templateName);
+  }
+  const tpl = await MessageTemplate.findOne({ metaTemplateName: templateName });
+  if (tpl) {
+    templateCache.set(templateName, tpl);
+  }
+  return tpl;
+};
+
 /**
  * Send a single queued message to Meta API.
  * Updates the MessageLog entry with the result.
@@ -36,6 +51,28 @@ const processMessage = async (log) => {
   const formattedPhone = formatPhone(log.recipientPhone);
   const components = [];
 
+  // 1. Fetch template to check for headers
+  const template = await getTemplate(log.templateName);
+  
+  if (template && template.headerType && template.headerType !== 'none') {
+    if (template.headerType === 'text' && template.headerContent) {
+      // Currently, text headers without parameters don't strictly require a component when sending,
+      // but if it has parameters, it does. For now, assuming static text header or handled via bodyParams.
+    } else if (['image', 'document', 'video'].includes(template.headerType) && template.headerContent) {
+      // Add media header component
+      components.push({
+        type: 'header',
+        parameters: [
+          {
+            type: template.headerType,
+            [template.headerType]: { link: template.headerContent }
+          }
+        ]
+      });
+    }
+  }
+
+  // 2. Add body component
   if (log.bodyParams && log.bodyParams.length > 0) {
     components.push({
       type: 'body',
