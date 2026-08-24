@@ -189,10 +189,10 @@ export default function CampaignDetailsModal({ campaignId, onClose }) {
                   {stats.failed > 0 && (
                     <button 
                       onClick={handleRetry}
-                      disabled={retrying}
+                      disabled={actionLoading}
                       className="text-[10px] uppercase tracking-wider font-bold bg-danger text-white px-2 py-0.5 rounded shadow-sm hover:bg-danger-dark transition-colors flex items-center gap-1 disabled:opacity-50"
                     >
-                      {retrying ? <RefreshCw size={10} className="animate-spin" /> : 'Retry'}
+                      {actionLoading ? <RefreshCw size={10} className="animate-spin" /> : 'Retry'}
                     </button>
                   )}
                 </div>
