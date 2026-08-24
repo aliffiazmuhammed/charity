@@ -172,4 +172,52 @@ router.post('/:campaignId/retry', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/campaigns/:campaignId/stop
+ * Stop an ongoing campaign by marking queued/scheduled messages as failed.
+ */
+router.post('/:campaignId/stop', async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+
+    const result = await MessageLog.updateMany(
+      { campaignId, status: { $in: ['queued', 'scheduled'] } },
+      { 
+        $set: { 
+          status: 'failed', 
+          errorMessage: 'Campaign manually stopped.'
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      stoppedCount: result.modifiedCount,
+      message: `Campaign stopped. ${result.modifiedCount} messages cancelled.`
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/campaigns/:campaignId
+ * Delete a campaign and all its message logs.
+ */
+router.delete('/:campaignId', async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+
+    const result = await MessageLog.deleteMany({ campaignId });
+
+    res.json({
+      success: true,
+      deletedCount: result.deletedCount,
+      message: `Campaign deleted. ${result.deletedCount} messages removed.`
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

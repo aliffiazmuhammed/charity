@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { getCampaignStatus, retryFailedCampaignMessages } from '../services/campaignService';
+import { getCampaignStatus, retryFailedCampaignMessages, stopCampaign, deleteCampaign } from '../services/campaignService';
 import { 
   X, RefreshCw, Send, CheckCheck, Eye, AlertTriangle, 
-  Clock, Inbox, Search, Calendar
+  Clock, Inbox, Search, Calendar, Play, Square, Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -12,7 +12,7 @@ export default function CampaignDetailsModal({ campaignId, onClose }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
-  const [retrying, setRetrying] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const fetchDetails = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -38,7 +38,7 @@ export default function CampaignDetailsModal({ campaignId, onClose }) {
   }, [campaignId]);
 
   const handleRetry = async () => {
-    setRetrying(true);
+    setActionLoading(true);
     try {
       await retryFailedCampaignMessages(campaignId);
       await fetchDetails(true);
@@ -46,7 +46,34 @@ export default function CampaignDetailsModal({ campaignId, onClose }) {
       console.error(err);
       alert('Failed to retry messages');
     } finally {
-      setRetrying(false);
+      setActionLoading(false);
+    }
+  };
+
+  const handleStop = async () => {
+    if (!window.confirm('Are you sure you want to stop the remaining queued/scheduled messages?')) return;
+    setActionLoading(true);
+    try {
+      await stopCampaign(campaignId);
+      await fetchDetails(true);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to stop campaign');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to completely delete this campaign and its history?')) return;
+    setActionLoading(true);
+    try {
+      await deleteCampaign(campaignId);
+      onClose(); // Close the modal since the campaign is gone
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete campaign');
+      setActionLoading(false);
     }
   };
 
@@ -105,14 +132,40 @@ export default function CampaignDetailsModal({ campaignId, onClose }) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {(stats.queued > 0 || stats.scheduled > 0) && (
+              <button 
+                onClick={handleStop}
+                disabled={actionLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 rounded-md text-sm font-medium transition-colors disabled:opacity-70"
+              >
+                <Square size={16} /> Stop
+              </button>
+            )}
+            {stats.failed > 0 && (
+              <button 
+                onClick={handleRetry}
+                disabled={actionLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-md text-sm font-medium transition-colors disabled:opacity-70"
+              >
+                <Play size={16} /> Resume / Retry ({stats.failed})
+              </button>
+            )}
+            <button 
+              onClick={handleDelete}
+              disabled={actionLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-danger-bg text-danger hover:bg-danger/20 rounded-md text-sm font-medium transition-colors disabled:opacity-70"
+            >
+              <Trash2 size={16} /> Delete
+            </button>
             <button 
               onClick={() => fetchDetails(true)} 
-              disabled={refreshing}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md text-sm font-medium transition-colors"
+              disabled={refreshing || actionLoading} 
+              className="p-2 text-text-muted hover:text-primary hover:bg-bg rounded-md transition-colors"
+              title="Refresh"
             >
-              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Refresh
+              <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
             </button>
-            <button onClick={onClose} className="p-2 text-text-muted hover:text-text-primary hover:bg-bg rounded-md transition-colors">
+            <button onClick={onClose} className="p-2 text-text-muted hover:text-danger hover:bg-bg rounded-md transition-colors">
               <X size={20} />
             </button>
           </div>
