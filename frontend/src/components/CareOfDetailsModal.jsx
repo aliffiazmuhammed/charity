@@ -17,8 +17,8 @@ export default function CareOfDetailsModal({ isOpen, onClose, careOfName }) {
   const loadDonations = async () => {
     setIsLoading(true);
     try {
-      // Fetch donations filtered by careOf. We'll fetch up to 50 for this view.
-      const data = await getDonations({ careOf: careOfName, limit: 50, sortBy: 'date', sortOrder: 'desc' });
+      // Fetch donations filtered by careOf. Fetching a large number to ensure all are shown.
+      const data = await getDonations({ careOf: careOfName, limit: 10000, sortBy: 'date', sortOrder: 'desc' });
       setDonations(data.donations || []);
     } catch (err) {
       console.error('Failed to load care of details:', err);
