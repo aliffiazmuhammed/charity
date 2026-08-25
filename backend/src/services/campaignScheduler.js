@@ -117,13 +117,13 @@ const processMessage = async (log) => {
     const errData = error.response?.data?.error || {};
     const errorCode = String(errData.code || error.response?.status || 'UNKNOWN');
 
-    // Check if rate limited (Meta error code 131056 or HTTP 429)
-    if (errorCode === '131056' || error.response?.status === 429) {
-      console.warn(`[Worker] ⚠️ Rate limited. Pausing for ${RATE_LIMIT_PAUSE / 1000}s...`);
+    // Check if globally rate limited (HTTP 429)
+    if (error.response?.status === 429) {
+      console.warn(`[Worker] ⚠️ Global rate limit hit. Pausing for ${RATE_LIMIT_PAUSE / 1000}s...`);
       return { success: false, rateLimited: true };
     }
 
-    // Increment retry count
+    // Increment retry count (131056 pair rate limit will fall through to here and eventually fail instead of blocking the queue forever)
     const retryCount = (log.retryCount || 0) + 1;
     if (retryCount <= MAX_RETRIES) {
       // Put back to queued for retry
